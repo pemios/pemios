@@ -32,6 +32,7 @@ pub enum AmoClass {
 
 #[allow(unused)]
 #[derive(Debug, Clone, Copy)]
+// TODO For a mapping to be reservable, it must be able to register callbacks when stores occur
 pub enum Reservability {
     /// No reservability; lr and sc instructions are unsupported.
     None = 0,
@@ -224,7 +225,7 @@ pub trait Mapping {
     ///
     /// `mask` is a slice of u8 to give the most generic possible interface and the function will
     /// panic if `mask.len() * 8 < dst.len()`.
-    /// A byte src[i] will only be written if (mask[i >> 3] >> (i & 7)) & 1 == 1
+    /// A byte `src[i]` will only be written if `(mask[i >> 3] >> (i & 7)) & 1 == 1`
     ///
     /// Like `block_write`, `block_write_masked` should work across sequential pages in the same
     /// memory mapping.
@@ -246,7 +247,7 @@ pub trait Mapping {
     ///
     /// `mask` is a slice of u8 to give the most generic possible interface and the function will
     /// panic if `mask.len() * 8 < dst.len()`.
-    /// A byte dst[i] will only be written to if (mask[i >> 3] >> (i & 7)) & 1 == 1
+    /// A byte `dst[i]` will only be written to if `(mask[i >> 3] >> (i & 7)) & 1 == 1`
     ///
     /// Like `block_read`, `block_read_masked` should work across sequential pages in the same
     /// memory mapping.
@@ -325,4 +326,12 @@ pub trait Mapping {
 
     fn attributes(&self) -> Pma;
     fn properties(&self) -> Properties;
+
+    /// Register a callback that should be called every time a change is made to the underlying
+    /// memory.
+    /// The callback should accept the offset that the store occured at.
+    ///
+    /// This is useful for informing reservation sets when devices make changes to memory or for
+    /// raising interrupts when operations complete or new data is available.
+    fn register_store_callback(&self, f: Box<dyn Fn(u32)>);
 }

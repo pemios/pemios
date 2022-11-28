@@ -396,11 +396,20 @@ impl From<Instruction> for Operation {
             },
         };
 
+        // Set reg to 0 if unused
+        let (rd, rs1, rs2) = match inst.opcode() {
+            Lui | Auipc | Jal => (inst.rd(), Reg::X0, Reg::X0),
+            Jalr | OpImm | Load | MiscMem => (inst.rd(), inst.rs1(), Reg::X0),
+            Branch | Store => (Reg::X0, inst.rs1(), inst.rs2()),
+            Amo | Op => (inst.rd(), inst.rs1(), inst.rs2()),
+            System | Invalid => (Reg::X0, Reg::X0, Reg::X0),
+        };
+
         Self {
             kind: inst.decode(),
-            rd: inst.rd(),
-            rs1: inst.rs1(),
-            rs2: inst.rs2(),
+            rd,
+            rs1,
+            rs2,
             value,
         }
     }
@@ -464,7 +473,7 @@ impl Operation {
 
     #[inline(always)]
     pub fn shamt(&self) -> u32 {
-        self.rs2 as u32
+        self.value & 0x1f
     }
 
     #[inline(always)]

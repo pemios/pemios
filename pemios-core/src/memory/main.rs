@@ -9,15 +9,16 @@
 
 use std::sync::Mutex;
 
-use super::memory_region::{Mapping, MemoryError, MemoryResult, Pma, Properties};
+use super::mapping::{Mapping, MemoryError, MemoryResult, Pma, Properties};
 
 type Frame = [u32; 1024];
 
-pub struct MainMemory {
+/// A main memory region that supports all memory operations
+pub struct Main {
     frames: Vec<Mutex<Frame>>,
 }
 
-impl Mapping for MainMemory {
+impl Mapping for Main {
     fn block_write(&self, offset: u32, src: &[u8]) -> MemoryResult<usize> {
         (offset & 3 == 0)
             .then_some(())
@@ -423,10 +424,15 @@ Did a thread exit unexpectedly while holding this Mutex?",
     fn properties(&self) -> Properties {
         Properties::new(self.frames.len())
     }
+
+    fn register_store_callback(&self, _f: Box<dyn Fn(u32)>) {
+        todo!()
+    }
 }
 
-impl MainMemory {
-    pub fn new(pages: usize) -> MainMemory {
+impl Main {
+    /// Create a new main memory with `pages` pages of 4096 bytes each.
+    pub fn new(pages: usize) -> Main {
         let frames = (0..pages).map(|_| Mutex::new([0; 1024])).collect();
         Self { frames }
     }
@@ -435,13 +441,13 @@ impl MainMemory {
 #[cfg(test)]
 mod tests {
     use crate::memory::{
-        main_memory::MainMemory,
-        memory_region::{Mapping, MemoryResult},
+        main::Main,
+        mapping::{Mapping, MemoryResult},
     };
 
     #[test]
     fn load_store() -> MemoryResult<()> {
-        let m = MainMemory::new(1);
+        let m = Main::new(1);
         m.store_word(0x60, 69)?;
         if let Ok(w) = m.load_word(0x60) {
             assert_eq!(w, 69, "Store or load failed");
@@ -451,7 +457,7 @@ mod tests {
 
     #[test]
     fn block_read_write() -> MemoryResult<()> {
-        let m = MainMemory::new(1);
+        let m = Main::new(1);
         let b = [69; 0x1000];
         let mut c = [0; 0x1000];
         m.block_write(0, &b[..])?;

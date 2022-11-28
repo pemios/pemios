@@ -7,5 +7,5 @@
 //
 // Copyright © 2022 mumblingdrunkard
 
-pub mod main_memory;
-pub mod memory_region;
+pub mod main;
+pub mod mapping;

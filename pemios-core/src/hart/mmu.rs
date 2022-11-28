@@ -13,7 +13,7 @@ use crate::{
     bus::{Bus, BusError},
     memory::{
         self,
-        memory_region::{Mapping, MemoryError, PmaPacked},
+        mapping::{Mapping, MemoryError, PmaPacked},
     },
 };
 
@@ -143,7 +143,7 @@ impl Mmu {
             return Ok(op);
         }
 
-        let missing = |x: &mut [Operation; 16]| -> memory::memory_region::MemoryResult<()> {
+        let missing = |x: &mut [Operation; 16]| -> memory::mapping::MemoryResult<()> {
             let mut raw = [0u32; 16];
             let (_, dst, _) = unsafe { raw.align_to_mut::<u8>() };
             self.bus.block_read(addr & 0xffffffc0, dst)?;

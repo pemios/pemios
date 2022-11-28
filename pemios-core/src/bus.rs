@@ -13,8 +13,8 @@ use fnv::FnvHashMap;
 
 use crate::memory::{
     self,
-    main_memory::MainMemory,
-    memory_region::{Mapping, MemoryError, MemoryResult, Properties},
+    main::Main,
+    mapping::{Mapping, MemoryError, MemoryResult, Properties},
 };
 
 #[derive(Debug)]
@@ -29,7 +29,7 @@ impl From<MemoryError> for BusError {
 }
 
 pub struct Bus {
-    main: MainMemory,
+    main: Main,
     #[allow(unused)]
     /// map[fnum] should contain (base, mapping).
     /// base is used to calculate the offset used for operations on mapping.
@@ -40,7 +40,7 @@ pub struct Bus {
 impl Bus {
     pub fn new(pages: usize) -> Self {
         Self {
-            main: MainMemory::new(pages),
+            main: Main::new(pages),
             map: HashMap::default(),
         }
     }
@@ -174,11 +174,15 @@ impl Mapping for Bus {
         todo!()
     }
 
-    fn attributes(&self) -> memory::memory_region::Pma {
+    fn attributes(&self) -> memory::mapping::Pma {
         todo!()
     }
 
     fn properties(&self) -> Properties {
         Properties::new(0xfffff)
+    }
+
+    fn register_store_callback(&self, _f: Box<dyn Fn(u32)>) {
+        todo!()
     }
 }
