@@ -28,7 +28,7 @@ mod zifencei;
 pub use register::Reg;
 
 use register::RegisterFile;
-use std::sync::{atomic::AtomicU8, Arc};
+use std::sync::Arc;
 
 use crate::bus::Bus;
 
@@ -37,22 +37,16 @@ use self::{
     mmu::Mmu,
 };
 
-#[allow(unused)]
 pub struct Hart {
-    intstatus: AtomicU8,
-    intcheck: u32,
     pc: u32,
     pub reg: RegisterFile,
     mmu: Mmu,
     // csr: [u32; 4096],
 }
 
-#[allow(unused)]
 impl Hart {
     pub fn new(bus: Arc<Bus>) -> Self {
         Self {
-            intstatus: AtomicU8::new(0),
-            intcheck: 0,
             pc: 0,
             reg: RegisterFile::new(),
             mmu: Mmu::new(bus),
