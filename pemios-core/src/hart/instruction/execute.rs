@@ -11,9 +11,12 @@ use crate::hart::{rv32i::Rv32i, Hart};
 
 #[cfg(feature = "rv32a")]
 use crate::hart::rv32a::Rv32a;
-
 #[cfg(feature = "rv32m")]
 use crate::hart::rv32m::Rv32m;
+#[cfg(feature = "zicsr")]
+use crate::hart::zicsr::Zicsr;
+#[cfg(feature = "zifencei")]
+use crate::hart::zifencei::Zifencei;
 
 use super::{Conclusion, Operation};
 
@@ -73,20 +76,20 @@ impl Hart {
             Ebreak => self.ebreak(&op),
 
             #[cfg(feature = "zifencei")]
-            Fencei => todo!(),
+            Fencei => self.fencei(&op),
 
             #[cfg(feature = "zicsr")]
-            CsrRw => todo!(),
+            CsrRw => self.csrrw(&op),
             #[cfg(feature = "zicsr")]
-            CsrRs => todo!(),
+            CsrRs => self.csrrs(&op),
             #[cfg(feature = "zicsr")]
-            CsrRc => todo!(),
+            CsrRc => self.csrrc(&op),
             #[cfg(feature = "zicsr")]
-            CsrRwi => todo!(),
+            CsrRwi => self.csrrwi(&op),
             #[cfg(feature = "zicsr")]
-            CsrRsi => todo!(),
+            CsrRsi => self.csrrsi(&op),
             #[cfg(feature = "zicsr")]
-            CsrRci => todo!(),
+            CsrRci => self.csrrci(&op),
 
             #[cfg(feature = "rv32m")]
             Mul => self.mul(&op),

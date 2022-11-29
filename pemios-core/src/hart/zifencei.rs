@@ -13,11 +13,11 @@ use super::{
 };
 
 pub trait Zifencei {
-    fn fence_i(&mut self, op: &Operation) -> Conclusion;
+    fn fencei(&mut self, op: &Operation) -> Conclusion;
 }
 
 impl Zifencei for Hart {
-    fn fence_i(&mut self, _op: &Operation) -> Conclusion {
+    fn fencei(&mut self, _op: &Operation) -> Conclusion {
         todo!()
     }
 }
