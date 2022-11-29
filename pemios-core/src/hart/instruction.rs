@@ -27,7 +27,6 @@ pub enum ExceptionKind {
     Ecall,
 }
 
-#[allow(unused)]
 pub enum Conclusion {
     None,
     Jumped,
@@ -35,7 +34,6 @@ pub enum Conclusion {
     Exception(ExceptionKind),
 }
 
-#[allow(unused)]
 #[derive(Copy, Clone, Debug)]
 #[repr(u8)]
 pub enum OpCode {
@@ -75,7 +73,6 @@ impl From<u32> for OpCode {
     }
 }
 
-#[allow(unused)]
 pub enum Format {
     RType,
     IType,
@@ -86,7 +83,6 @@ pub enum Format {
     Invalid,
 }
 
-#[allow(unused)]
 impl OpCode {
     pub fn format(&self) -> Format {
         use Format::*;
@@ -104,7 +100,6 @@ impl OpCode {
 }
 
 impl Instruction {
-    #[allow(unused)]
     pub fn format(&self) -> Format {
         self.opcode().format()
     }
@@ -125,7 +120,6 @@ impl From<u32> for Operation {
     }
 }
 
-#[allow(unused)]
 #[repr(u8)]
 pub enum FenceMode {
     None = 0b0000,
@@ -146,7 +140,6 @@ impl From<u32> for FenceMode {
 #[derive(Copy, Clone)]
 pub struct FenceSet(u8);
 
-#[allow(unused)]
 impl FenceSet {
     pub fn i(&self) -> bool {
         self.0 & 0b1000 != 0
@@ -218,7 +211,6 @@ impl Bit for Instruction {
     }
 }
 
-#[allow(unused)]
 impl Instruction {
     #[inline(always)]
     pub fn raw(&self) -> u32 {
@@ -375,6 +367,7 @@ impl From<Instruction> for Operation {
 
             _ => match inst.opcode() {
                 System => match inst.decode() {
+                    #[cfg(feature = "zicsr")]
                     InstructionKind::CsrRw
                     | InstructionKind::CsrRwi
                     | InstructionKind::CsrRs
@@ -415,7 +408,6 @@ impl From<Instruction> for Operation {
     }
 }
 
-#[allow(unused)]
 #[derive(Debug, Copy, Clone)]
 // Operation should contain all the information necessary to convert it back to
 // its source instruction without any loss.
@@ -439,7 +431,6 @@ impl Default for Operation {
     }
 }
 
-#[allow(unused)]
 impl Operation {
     pub fn new(kind: InstructionKind, rd: Reg, rs1: Reg, rs2: Reg, value: u32) -> Self {
         Self {
