@@ -26,7 +26,8 @@ pub enum AmoClass {
     /// Logical atomics; amoand, amoor, amoxor + Swap atomics are supported
     Logical,
 
-    /// Arithmetic atomics; amoadd, amomin[u], amomax[u] + Logical + Swap atomics are supported
+    /// Arithmetic atomics; amoadd, amomin[u], amomax[u] + Logical + Swap
+    /// atomics are supported
     Arithmetic,
 }
 
@@ -37,38 +38,45 @@ pub enum Reservability {
     /// No reservability; lr and sc instructions are unsupported.
     None = 0,
 
-    /// Reservability, but no eventuality guarantees; sc is allowed to never succeed.
+    /// Reservability, but no eventuality guarantees; sc is allowed to never
+    /// succeed.
     NonEventual,
 
-    /// Reservability and eventuality; sc must eventually succeed if other conditions are upheld
+    /// Reservability and eventuality; sc must eventually succeed if other
+    /// conditions are upheld
     Eventual,
 }
 
 #[allow(unused)]
 #[derive(Debug, Clone, Copy)]
 pub enum Idempotency {
-    /// This region is not idempotent and spurious reads or writes must not occur.
-    /// This implies no caching.
-    /// Usually the case for stream I/O devices such as UART.
+    /// This region is not idempotent and spurious reads or writes must not
+    /// occur.
+    /// The core is also not allowed to skip reads or writes to this mapping.
+    /// This implies no caching of results.
     NonIdempotent = 0,
 
-    /// This region is idempotent and spurious reads or writes can occur.
+    /// This region is idempotent and spurious reads or writes can occur without
+    /// side-effects.
     Idempotent,
 }
 
 #[allow(unused)]
 #[derive(Debug, Clone, Copy)]
 pub enum Cacheability {
-    /// This region cannot be cached in any way. All loads and stores must be coherent.
+    /// This region cannot be cached in any way.
+    /// All loads and stores must be coherent.
     NonCacheable = 0,
 
     /// This region accepts streamed writes or loads.
     Stream,
 
-    /// This region accepts streamed writes. Loads can be cached.
+    /// This region accepts streamed writes.
+    /// Loads can be cached.
     WriteStreamLoadCache,
 
     /// This region is fully cacheable
+    /// Implies the mapping supports `block_read` and `block_write`.
     Cacheable,
 }
 
@@ -201,93 +209,117 @@ pub type MemoryResult<T> = std::result::Result<T, MemoryError>;
 
 #[allow(unused)]
 pub struct Properties {
-    pages: usize,
+    frames: usize,
 }
 
 impl Properties {
-    pub fn new(pages: usize) -> Self {
-        Self { pages }
+    pub fn new(frames: usize) -> Self {
+        Self { frames }
     }
 }
 
 #[allow(unused)]
+/// A memory mapping
+///
+/// Note that none of the methods required by this trait take `&mut self`.
+/// This requires that mappings have interior mutability (or be read-only
+/// memories).
+///
+/// This is done instead of using a Mutex around each Mapping to allow for
+/// nicer implementations  where it is possible.
+///
+/// Streaming devices could for example be implemented with a lock-free queue,
+/// or certain parts of a mapping may be faster to implement with atomics
+/// instead of a Mutex-wrapped array.
 pub trait Mapping {
     /// Intended for writing chunks of bytes from a region of memory.
     ///
-    /// `block_write` should work across sequential pages in the same memory mapping.
-    /// I.e. if a device exposes 4 sequential pages of mapped memory, a `block_write` with
-    /// `src.len()` == 16384 and offset = 0 should succeed.
+    /// `block_write` should work across sequential frames in the same memory
+    /// mapping.
+    /// E.g. if a device exposes 4 sequential frames of mapped memory and
+    /// supports block-operations, a `block_write` with `src.len()` == 16384 and
+    /// offset = 0 should succeed.
+    ///
+    /// When writing to unbacked offsets, this function is **not** allowed to
+    /// return an error, and should instead ignore the write for the unbacked
+    /// locations.
     ///
     /// Not all mappings may support `block_write`.
     fn block_write(&self, offset: u32, src: &[u8]) -> MemoryResult<usize>;
 
-    /// Like `block_write`, but a bit-mask can be provided to only write the desired bytes.
+    /// Like `block_write`, but a bit-mask can be provided to only write the
+    /// desired bytes.
     ///
-    /// `mask` is a slice of u8 to give the most generic possible interface and the function will
-    /// panic if `mask.len() * 8 < dst.len()`.
-    /// A byte `src[i]` will only be written if `(mask[i >> 3] >> (i & 7)) & 1 == 1`
+    /// `mask` is a slice of u8 to give the most generic possible interface and
+    /// the function will panic if `mask.len() * 8 < dst.len()`.
+    /// A byte `src[i]` will only be written if
+    /// `(mask[i >> 3] >> (i & 7)) & 1 == 1`
     ///
-    /// Like `block_write`, `block_write_masked` should work across sequential pages in the same
-    /// memory mapping.
-    /// I.e. if a device exposes 4 sequential pages of mapped memory, a `block_write_masked` with
-    /// `src.len()` == 16384 and offset = 0 should succeed.
-    ///
-    /// Like `block_write`, not all mappings may support `block_write_masked`, *but* if
-    /// `block_write` is supported, `block_write_masked` must also be supported.
+    /// All mappings that support `block_write` must also support
+    /// `block_write_masked`
     fn block_write_masked(&self, offset: u32, src: &[u8], mask: &[u8]) -> MemoryResult<usize>;
 
     /// Intended for reading chunks of bytes from a region of memory.
     ///
-    /// `block_read` should work across sequential pages in the same memory mapping.
-    /// I.e. if a device exposes 4 sequential pages of mapped memory, a `block_read` with
-    /// `dst.len()` == 16384 and offset = 0 should succeed.
+    /// `block_read` should work across sequential frames in the same memory
+    /// mapping.
+    /// E.g. if a device exposes 4 sequential frames of mapped memory and
+    /// supports block operations, a `block_read` with `dst.len()` == 16384 and
+    /// offset = 0 should succeed.
+    ///
+    /// When reading from unbacked offsets, this function is **not** allowed to
+    /// return an error, and should instead ignore the read for the unbacked
+    /// locations.
+    ///
+    /// Not all mappings may support `block_read`.
     fn block_read(&self, offset: u32, dst: &mut [u8]) -> MemoryResult<usize>;
 
-    /// Like `block_read`, but a bit-mask can be provided to only read the desired bytes.
+    /// Like `block_read`, but a bit-mask can be provided to only read the
+    /// desired bytes.
     ///
-    /// `mask` is a slice of u8 to give the most generic possible interface and the function will
-    /// panic if `mask.len() * 8 < dst.len()`.
-    /// A byte `dst[i]` will only be written to if `(mask[i >> 3] >> (i & 7)) & 1 == 1`
+    /// `mask` is a slice of u8 to give the most generic possible interface and
+    /// the function will panic if `mask.len() * 8 < dst.len()`.
+    /// A byte `dst[i]` will only be written to if
+    /// `(mask[i >> 3] >> (i & 7)) & 1 == 1`.
     ///
-    /// Like `block_read`, `block_read_masked` should work across sequential pages in the same
-    /// memory mapping.
-    /// I.e. if a device exposes 4 sequential pages of mapped memory, a `block_read_masked` with
-    /// `dst.len()` == 16384 and offset = 0 should succeed.
-    ///
-    /// Like `block_read`, not all mappings may support `block_read_masked`, *but* if
-    /// `block_read` is supported, `block_read_masked` must also be supported.
+    /// All mappings that support `block_read` must also support
+    /// `block_read_masked`
     fn block_read_masked(&self, offset: u32, dst: &mut [u8], mask: &[u8]) -> MemoryResult<usize>;
 
-    /// Intended to perform a stream of writes in a single call.
-    /// Useful for write-combine operations on I/O that may otherwise be very slow; e.g. when
-    /// writing a stream of bytes to UART.
+    /// Intended to perform a sequence of writes in a single call.
+    /// Useful for write-combine operations on I/O that may otherwise be very
+    /// slow; e.g. when writing a stream of bytes to UART.
     ///
-    /// Unlike block operations, stream operations are only supported on one frame at a time.
-    /// This is done for technical reasons to simplify the implementation of the write-combinging
-    /// buffers.
-    /// It also enables encoding writes as an offset into the frame, saving a few bytes.
+    /// Unlike block operations, stream operations are only supported on one
+    /// frame at a time.
+    /// This is done for technical reasons to simplify the implementation of
+    /// the write-combining buffers.
+    /// It also enables encoding writes as an offset into the frame, saving a
+    /// few bytes.
     ///
     /// Writes are encoded as `(offset: u16, width: u8, value: u32)`
     /// `offset` should be a 12-bit offset into the frame,
     /// `width` should be 1, 2, or 4; the number of bytes to be written, and
-    /// `value` should be a `width` byte wide, right-aligned value to be written.
+    /// `value` should be a `width` byte wide, right-aligned value.
     ///
-    /// If the mapping does not support misaligned writes and a misaligned write is encountered,
-    /// this function **must panic**
-    /// This is because later instructions -- issued after writes in the buffer -- may have
-    /// completed, breaking precise exceptions.
-    /// It is therefore important that the mapping is queried for support of misaligned stores
-    /// before the write is added to a write buffer.
+    /// If the mapping does not support misaligned writes and a misaligned
+    /// write is encountered, this function **must panic**.
+    /// This is because later instructions -- issued after writes in the buffer
+    /// -- may have completed, breaking precise exceptions.
+    /// It is therefore important that the mapping is queried for support of
+    /// misaligned stores before the write is added to a write buffer.
     fn stream_write(&self, frame: u32, writes: &[(u16, u8, u32)]) -> MemoryResult<usize>;
 
-    /// Intended to perform a stream of reads in a single call.
-    /// Useful for read-combine operations on I/O that may otherwise be very slow; e.g. when
-    /// reading a stream of bytes from UART.
+    /// Intended to perform a sequence of reads in a single call.
+    /// Useful for read-combine operations on I/O that may otherwise be very
+    /// slow; e.g. when reading a stream of bytes from UART.
     ///
-    /// Unlike block operations, stream operations are only supported on one frame at a time.
-    /// This is done for technical reasons to simplify the implementation of the read-combinging
-    /// buffers.
-    /// It also enables encoding reads as an offset into the frame, saving a few bytes.
+    /// Unlike block operations, stream operations are only supported on one
+    /// frame at a time.
+    /// This is done for technical reasons to simplify the implementation of
+    /// the read-combining buffers.
+    /// It also enables encoding reads as an offset into the frame, saving a
+    /// few bytes.
     ///
     /// This function will panic when `reads.len() != dst.len()`.
     ///
@@ -295,13 +327,13 @@ pub trait Mapping {
     /// `offset` should be a 12-bit offset into the frame, and
     /// `width` should be 1, 2, or 4; the number of bytes to be read.
     ///
-    /// If the mapping does not support misaligned reads and a misaligned read is encountered,
-    /// this function **must panic**
-    /// This is because later instructions -- issued after reads in the buffer -- may have
-    /// completed, breaking precise exceptions.
-    /// It is therefore important that the mapping is queried for support of misaligned reads
-    /// before the read is added to a read buffer.
-    fn stream_read(&self, frame: u32, reads: &[(u16, u8)], dst: &mut [u32]);
+    /// If the mapping does not support misaligned reads and a misaligned read
+    /// is encountered, this function **must panic**
+    /// This is because later instructions -- issued after reads in the buffer
+    /// -- may have completed, breaking precise exceptions.
+    /// It is therefore important that the mapping is queried for support of
+    /// misaligned reads before the read is added to a read buffer.
+    fn stream_read(&self, frame: u32, reads: &[(u16, u8)], dst: &mut [u32]) -> MemoryResult<usize>;
 
     fn store_byte(&self, offset: u32, byte: u8) -> MemoryResult<()>;
     fn store_half_word(&self, offset: u32, half_word: u16) -> MemoryResult<()>;
@@ -327,11 +359,12 @@ pub trait Mapping {
     fn attributes(&self) -> Pma;
     fn properties(&self) -> Properties;
 
-    /// Register a callback that should be called every time a change is made to the underlying
-    /// memory.
+    /// Register a callback that should be called every time a change is made
+    /// to the underlying memory.
     /// The callback should accept the offset that the store occured at.
     ///
-    /// This is useful for informing reservation sets when devices make changes to memory or for
-    /// raising interrupts when operations complete or new data is available.
+    /// This is useful for informing reservation sets when devices make changes
+    /// to memory or for raising interrupts when operations complete or new
+    /// data is available.
     fn register_store_callback(&self, f: Box<dyn Fn(u32)>);
 }

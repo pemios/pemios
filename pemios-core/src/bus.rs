@@ -29,11 +29,28 @@ impl From<MemoryError> for BusError {
 }
 
 pub struct Bus {
+    /// The main memory segment starts at address 0 and has some size.
     main: Main,
+
     #[allow(unused)]
-    /// map[fnum] should contain (base, mapping).
-    /// base is used to calculate the offset used for operations on mapping.
-    /// A mapping that provides 4 pages of memory should appear 4 times in this map.
+    /// map[fnum] should contain (base_frame_number, mapping).
+    /// base_frame_number is used to calculate the offset used for operations on
+    /// the mapping.
+    ///
+    /// A mapping may appear multiple times in this map if it has a size larger
+    /// than a single frame (4096 bytes).
+    /// E.g. when adding a mapping that reports a frame count of 4, at frame
+    /// number 2, the result should be that map[2], map[3], map[4], and map[5]
+    /// all return the same thing.
+    ///
+    /// It is possible for a device to provide several mappings that may all be
+    /// mapped at different locations in memory.
+    /// E.g. control registers could be mapped at some location, while buffers
+    /// may be located at a very different offset.
+    ///
+    /// This map does not have exclusive ownership of the mapping, and mappings
+    /// at different frame numbers may have different implementations, hence the
+    /// Arc<Box<dyn ...>>
     map: FnvHashMap<u32, (u32, Arc<Box<dyn Mapping>>)>,
 }
 
@@ -45,12 +62,11 @@ impl Bus {
         }
     }
 
-    pub fn with_mapping(self, _offset: u32, _region: Arc<Box<dyn Mapping>>) -> Self {
+    pub fn with_mapping(self, _starting_frame_number: u32, _region: Arc<Box<dyn Mapping>>) -> Self {
         todo!("Add mapping to map")
     }
 
-    pub fn set_mm(&self, data: &[u32]) -> MemoryResult<usize> {
-        let (_, data, _) = unsafe { data.align_to::<u8>() };
+    pub fn set_mm(&self, data: &[u8]) -> MemoryResult<usize> {
         self.main.block_write(0, data)
     }
 }
@@ -85,9 +101,9 @@ impl Mapping for Bus {
         todo!()
     }
 
-    fn stream_write(&self, frame: u32, writes: &[(u16, u8, u32)]) -> MemoryResult<usize> {
-        if frame & 0x00080000 == 0 {
-            self.main.stream_write(frame, writes)
+    fn stream_write(&self, frame_number: u32, writes: &[(u16, u8, u32)]) -> MemoryResult<usize> {
+        if frame_number & 0x00080000 == 0 {
+            self.main.stream_write(frame_number, writes)
         } else {
             todo!("Stream write to a mapping")
         }
@@ -95,12 +111,12 @@ impl Mapping for Bus {
 
     fn stream_read(
         &self,
-        frame: u32,
-        reads: &[(u16 /* Offset */, u8 /* width */)],
+        frame_number: u32,
+        reads: &[(u16 /* offset */, u8 /* width */)],
         dst: &mut [u32],
-    ) {
-        if frame & 0x00080000 == 0 {
-            self.main.stream_read(frame, reads, dst)
+    ) -> MemoryResult<usize> {
+        if frame_number & 0x00080000 == 0 {
+            self.main.stream_read(frame_number, reads, dst)
         } else {
             todo!("Stream read from a mapping")
         }

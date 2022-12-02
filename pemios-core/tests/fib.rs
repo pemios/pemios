@@ -17,7 +17,6 @@ mod tests {
     use {
         pemios_core::bus::Bus,
         pemios_core::hart::{
-            csr::Csr,
             instruction::{Conclusion, Execute},
             Reg,
         },
@@ -29,14 +28,7 @@ mod tests {
         use pemios_core::hart::Hart;
         use std::fs;
 
-        println!("{}", Csr::Invalid as usize);
-
-        let program = fs::read("resources/test_programs/fib")
-            .unwrap()
-            .chunks(4)
-            .map(|c| [c[0], c[1], c[2], c[3]])
-            .map(u32::from_ne_bytes)
-            .collect::<Vec<_>>();
+        let program = fs::read("resources/test_programs/fib").unwrap();
 
         let bus = Arc::new(Bus::new(1024));
         if let Err(_) = bus.set_mm(&program) {

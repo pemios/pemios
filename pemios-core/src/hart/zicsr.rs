@@ -22,26 +22,32 @@ pub trait Zicsr {
 }
 
 impl Zicsr for Hart {
+    #[inline(always)]
     fn csrrw(&mut self, _op: &Operation) -> Conclusion {
         todo!()
     }
 
+    #[inline(always)]
     fn csrrs(&mut self, _op: &Operation) -> Conclusion {
         todo!()
     }
 
+    #[inline(always)]
     fn csrrc(&mut self, _op: &Operation) -> Conclusion {
         todo!()
     }
 
+    #[inline(always)]
     fn csrrwi(&mut self, _op: &Operation) -> Conclusion {
         todo!()
     }
 
+    #[inline(always)]
     fn csrrsi(&mut self, _op: &Operation) -> Conclusion {
         todo!()
     }
 
+    #[inline(always)]
     fn csrrci(&mut self, _op: &Operation) -> Conclusion {
         todo!()
     }

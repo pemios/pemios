@@ -37,6 +37,7 @@ where
         }
     }
 
+    #[inline(always)]
     pub fn get_block(&self, tag: Tag<S, B>) -> Option<&Block<T, U, B>> {
         self.tags
             .iter()
@@ -44,6 +45,7 @@ where
             .and_then(|i| self.blocks.get(i))
     }
 
+    #[inline(always)]
     pub fn get_block_mut(&mut self, tag: Tag<S, B>) -> Option<&mut Block<T, U, B>> {
         self.tags.iter().position(|&t| t == tag).and_then(|i| {
             self.dirty[i] = true;
@@ -51,6 +53,7 @@ where
         })
     }
 
+    #[inline(always)]
     pub fn get_block_or_insert_with<F, O, E>(
         &mut self,
         tag: Tag<S, B>,
@@ -67,6 +70,7 @@ where
         }
     }
 
+    #[inline(always)]
     pub fn get_block_mut_or_insert_with<F, O, E>(
         &mut self,
         tag: Tag<S, B>,
@@ -84,6 +88,7 @@ where
     }
 
     #[allow(unused)]
+    #[inline(always)]
     pub fn insert(
         &mut self,
         tag: Tag<S, B>,
@@ -113,6 +118,7 @@ where
         )
     }
 
+    #[inline(always)]
     pub fn insert_with<F, O, E>(
         &mut self,
         tag: Tag<S, B>,

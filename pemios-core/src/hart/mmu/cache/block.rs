@@ -58,10 +58,12 @@ where
         }
     }
 
+    #[inline(always)]
     pub fn get(&self, cbo: BlockOffset<B>) -> &T {
         unsafe { self.data.get_unchecked(cbo.raw() as usize) }
     }
 
+    #[inline(always)]
     pub fn get_mut(&mut self, cbo: BlockOffset<B>) -> (&mut T, &mut U) {
         unsafe {
             (
@@ -71,10 +73,12 @@ where
         }
     }
 
+    #[inline(always)]
     pub fn internal(&self) -> (&[T; 1 << B], &U) {
         (&self.data, &self.tracker)
     }
 
+    #[inline(always)]
     pub fn internal_mut(&mut self) -> (&mut [T; 1 << B], &mut U) {
         (&mut self.data, &mut self.tracker)
     }

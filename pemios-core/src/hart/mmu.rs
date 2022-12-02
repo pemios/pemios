@@ -43,7 +43,7 @@ impl From<MemoryError> for MmuError {
     }
 }
 
-type MmuResult<T> = std::result::Result<T, MmuError>;
+pub type MmuResult<T> = std::result::Result<T, MmuError>;
 
 pub struct Mmu {
     d_cache: cache::Cache<u32, u64, 8, 2, 4>,
@@ -63,20 +63,24 @@ trait AsU8Array<const W: usize> {
 }
 
 impl AsU8Array<4> for u32 {
+    #[inline(always)]
     fn as_u8_array(&self) -> &[u8; 4] {
         unsafe { std::mem::transmute::<&Self, &[u8; 4]>(self) }
     }
 
+    #[inline(always)]
     fn as_u8_array_mut(&mut self) -> &mut [u8; 4] {
         unsafe { std::mem::transmute::<&mut Self, &mut [u8; 4]>(self) }
     }
 }
 
 impl AsU8Array<8> for u64 {
+    #[inline(always)]
     fn as_u8_array(&self) -> &[u8; 8] {
         unsafe { std::mem::transmute::<&Self, &[u8; 8]>(self) }
     }
 
+    #[inline(always)]
     fn as_u8_array_mut(&mut self) -> &mut [u8; 8] {
         unsafe { std::mem::transmute::<&mut Self, &mut [u8; 8]>(self) }
     }
@@ -88,10 +92,12 @@ trait AsU16Array<const W: usize> {
 }
 
 impl AsU16Array<2> for u32 {
+    #[inline(always)]
     fn as_u16_array(&self) -> &[u16; 2] {
         unsafe { std::mem::transmute::<&Self, &[u16; 2]>(self) }
     }
 
+    #[inline(always)]
     fn as_u16_array_mut(&mut self) -> &mut [u16; 2] {
         unsafe { std::mem::transmute::<&mut Self, &mut [u16; 2]>(self) }
     }
@@ -129,19 +135,21 @@ impl Mmu {
             return Err(MmuError::LoadMisaligned { addr, alignment: 2 });
         }
 
-        if self.cacheable(addr) {
-            // fast path
-            if let Some(&w) = self.d_cache.get(addr >> 2) {
-                if W == 4 {
-                    return Ok(u32::from_le(w));
-                } else if W == 2 {
-                    let a = w.as_u16_array();
-                    return Ok(u16::from_le(a[(addr as usize >> 1) & 1]) as u32);
-                } else {
-                    let a = w.as_u8_array();
-                    return Ok((a[addr as usize & 3]) as u32);
-                }
+        // fast path, if the value is in cache, it's cacheable
+        if let Some(&w) = self.d_cache.get(addr >> 2) {
+            if W == 4 {
+                return Ok(u32::from_le(w));
+            } else if W == 2 {
+                let a = w.as_u16_array();
+                return Ok(u16::from_le(a[(addr as usize >> 1) & 1]) as u32);
+            } else {
+                let a = w.as_u8_array();
+                return Ok((a[addr as usize & 3]) as u32);
             }
+        }
+
+        if self.cacheable(addr) {
+            // if the address is cacheable, cache it
 
             // closure to be executed when cache line is missing
             let missing = |x: &mut [u32; 16]| {
@@ -168,26 +176,35 @@ impl Mmu {
                 Ok((a[addr as usize & 3]) as u32)
             }
         } else {
+            // check if address supports streamed operations
             todo!()
         }
     }
 
     #[inline(always)]
-    pub fn load_byte(&mut self, _addr: u32) -> MmuResult<u32> {
-        todo!()
+    fn load<const W: usize>(&mut self, addr: u32) -> MmuResult<u32> {
+        assert!(matches!(W, 1 | 2 | 4), "Load width must be 1, 2, or 4!");
+
+        // TODO Address translation
+        // TODO Check user mode
+        // TODO Check read permissions
+
+        self.load_physical::<W>(addr)
     }
 
     #[inline(always)]
-    pub fn load_half_word(&mut self, _addr: u32) -> MmuResult<u32> {
-        todo!()
+    pub fn load_byte(&mut self, addr: u32) -> MmuResult<u32> {
+        self.load::<1>(addr)
+    }
+
+    #[inline(always)]
+    pub fn load_half_word(&mut self, addr: u32) -> MmuResult<u32> {
+        self.load::<2>(addr)
     }
 
     #[inline(always)]
     pub fn load_word(&mut self, addr: u32) -> MmuResult<u32> {
-        // TODO Address translation
-        // TODO Check user mode
-        // TODO Check read permissions
-        self.load_physical::<4>(addr)
+        self.load::<4>(addr)
     }
 
     #[inline(always)]
@@ -231,24 +248,26 @@ impl Mmu {
             return Err(MmuError::LoadMisaligned { addr, alignment: 2 });
         }
 
+        // fast path, if it is in cache, it's cacheable
+
+        if let Some((target, tracker)) = self.d_cache.get_mut(addr >> 2) {
+            if W == 4 {
+                *target = val.to_le();
+                *tracker |= 15 << (addr & 0x3f);
+            } else if W == 2 {
+                let a = target.as_u16_array_mut();
+                a[(addr as usize >> 1) & 1] = (val as u16).to_le();
+                *tracker |= 3 << (addr & 0x3f);
+            } else {
+                let a = target.as_u8_array_mut();
+                a[addr as usize & 3] = val as u8;
+                *tracker |= 1 << (addr & 0x3f);
+            }
+            return Ok(());
+        }
+
         if self.cacheable(addr) {
             // fast path
-            if let Some((target, tracker)) = self.d_cache.get_mut(addr >> 2) {
-                if W == 4 {
-                    *target = val.to_le();
-                    *tracker |= 15 << (addr & 0x3f);
-                } else if W == 2 {
-                    let a = target.as_u16_array_mut();
-                    a[(addr as usize >> 1) & 1] = (val as u16).to_le();
-                    *tracker |= 3 << (addr & 0x3f);
-                } else {
-                    let a = target.as_u8_array_mut();
-                    a[addr as usize & 3] = val as u8;
-                    *tracker |= 1 << (addr & 0x3f);
-                }
-                return Ok(());
-            }
-
             // closure to be executed when cache line is missing
             let missing = |x: &mut [u32; 16]| {
                 let (_, dst, _) = unsafe { x.align_to_mut::<u8>() };
@@ -284,18 +303,29 @@ impl Mmu {
     }
 
     #[inline(always)]
+    fn store<const W: usize>(&mut self, addr: u32, val: u32) -> MmuResult<()> {
+        assert!(matches!(W, 1 | 2 | 4), "Load width must be 1, 2, or 4");
+
+        if false {
+            todo!("Address translation");
+        }
+
+        self.store_physical::<W>(addr, val)
+    }
+
+    #[inline(always)]
     pub fn store_byte(&mut self, addr: u32, b: u8) -> MmuResult<()> {
-        self.store_physical::<1>(addr, b as u32)
+        self.store::<1>(addr, b as u32)
     }
 
     #[inline(always)]
     pub fn store_half_word(&mut self, addr: u32, hw: u16) -> MmuResult<()> {
-        self.store_physical::<2>(addr, hw as u32)
+        self.store::<2>(addr, hw as u32)
     }
 
     #[inline(always)]
     pub fn store_word(&mut self, addr: u32, w: u32) -> MmuResult<()> {
-        self.store_physical::<4>(addr, w)
+        self.store::<4>(addr, w)
     }
 
     #[inline(always)]

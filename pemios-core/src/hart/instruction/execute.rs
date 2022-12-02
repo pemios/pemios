@@ -131,7 +131,7 @@ impl Hart {
             #[cfg(feature = "rv32a")]
             AmoMaxuw => self.amomaxu_w(&op),
 
-            Invalid => todo!(),
+            Invalid => self.inst_invalid(&op),
         };
 
         match conclusion {

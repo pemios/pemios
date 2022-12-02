@@ -40,18 +40,21 @@ where
         }
     }
 
+    #[inline(always)]
     pub fn get(&self, addr: u32) -> Option<&T> {
         let addr = Self::addr_from_u32(addr);
         self.get_block(addr.tag_set())
             .and_then(|b| Some(b.get(addr.offset())))
     }
 
+    #[inline(always)]
     pub fn get_mut(&mut self, addr: u32) -> Option<(&mut T, &mut U)> {
         let addr = Self::addr_from_u32(addr);
         self.get_block_mut(addr.tag_set())
             .and_then(|b| Some(b.get_mut(addr.offset())))
     }
 
+    #[inline(always)]
     pub fn get_or_insert_with<F, O, E>(
         &mut self,
         addr: u32,
@@ -80,6 +83,7 @@ where
         ))
     }
 
+    #[inline(always)]
     pub fn get_mut_or_insert_with<F, O, E>(
         &mut self,
         addr: u32,
@@ -107,27 +111,33 @@ where
         ))
     }
 
+    #[inline(always)]
     fn get_set(&self, csi: SetIndex<S, B>) -> &Set<T, U, S, A, B> {
         unsafe { self.sets.get_unchecked(csi.raw() as usize) }
     }
 
+    #[inline(always)]
     fn get_set_mut(&mut self, csi: SetIndex<S, B>) -> &mut Set<T, U, S, A, B> {
         unsafe { self.sets.get_unchecked_mut(csi.raw() as usize) }
     }
 
+    #[inline(always)]
     fn get_block(&self, cts: TagSet<S, B>) -> Option<&Block<T, U, B>> {
         self.get_set(cts.set()).get_block(cts.tag())
     }
 
+    #[inline(always)]
     fn get_block_mut(&mut self, cts: TagSet<S, B>) -> Option<&mut Block<T, U, B>> {
         self.get_set_mut(cts.set()).get_block_mut(cts.tag())
     }
 
+    #[inline(always)]
     fn addr_from_u32(addr: u32) -> Addr<S, B> {
         addr.into()
     }
 
     #[allow(unused)]
+    #[inline(always)]
     pub fn insert(&mut self, addr: u32, block: [T; 1 << B]) -> Option<(u32, [T; 1 << B], U)> {
         let addr = Self::addr_from_u32(addr);
         if let Some((tag, block)) = self
@@ -148,6 +158,7 @@ where
     }
 
     #[allow(unused)]
+    #[inline(always)]
     pub fn insert_with<F, O, E>(
         &mut self,
         addr: u32,

@@ -56,6 +56,7 @@ impl Hart {
     /// Invalid instruction
     /// Not a part of spec, but included for cases when decoding does not recognise the
     /// instruction.
+    #[inline(always)]
     fn inst_invalid(&mut self, op: &Operation) -> Conclusion {
         panic!("Executed invalid instruction! {:?}", op.kind());
     }
