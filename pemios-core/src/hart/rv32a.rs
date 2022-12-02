@@ -27,7 +27,7 @@ pub trait Rv32a {
     fn amomaxu_w(&mut self, op: &Operation) -> Conclusion;
 }
 
-impl Rv32a for Hart {
+impl<'a> Rv32a for Hart<'a> {
     #[inline(always)]
     fn lr_w(&mut self, _op: &Operation) -> Conclusion {
         todo!()

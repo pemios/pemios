@@ -150,7 +150,7 @@ pub trait Rv32i {
 }
 
 #[deny(clippy::integer_arithmetic)] // only use wrapping arithmetic
-impl Rv32i for Hart {
+impl<'a> Rv32i for Hart<'a> {
     // Load upper immediate
     #[inline(always)]
     fn lui(&mut self, op: &Operation) -> Conclusion {

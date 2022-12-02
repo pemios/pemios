@@ -7,7 +7,7 @@
 //
 // Copyright © 2022 mumblingdrunkard
 
-use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use crate::{
     bus::{Bus, BusError},
@@ -45,7 +45,29 @@ impl From<MemoryError> for MmuError {
 
 pub type MmuResult<T> = std::result::Result<T, MmuError>;
 
-pub struct Mmu {
+pub fn addr_to_reservation_set(addr: u32) -> u32 {
+    addr >> 6
+}
+
+pub fn helper_invalidate_reservations(
+    reservations: &[&std::sync::atomic::AtomicU32],
+    should_be: u32,
+) {
+    reservations.iter().for_each(|r| {
+        let _ = r.compare_exchange(should_be, 0xffffffff, Ordering::Relaxed, Ordering::Relaxed);
+    });
+}
+
+pub fn helper_check_reservation(reservation: &AtomicU32, should_be: u32) -> u32 {
+    match reservation.compare_exchange(should_be, 0xffffffff, Ordering::Relaxed, Ordering::Relaxed)
+    {
+        Ok(_) => 0,
+        Err(_) => 1,
+    }
+}
+
+pub struct Mmu<'a> {
+    reservation: &'a AtomicU32,
     d_cache: cache::Cache<u32, u64, 8, 2, 4>,
     i_cache: cache::Cache<Operation, (), 8, 2, 4>,
     // only one element per cache line as it makes little sense to block-fetch memory attributes
@@ -54,7 +76,7 @@ pub struct Mmu {
     // only one element per cache line as block-fetching translations also makes no sense
     #[allow(unused)]
     tlb: cache::Cache<Pte, (), 12, 3, 0>,
-    bus: Arc<Bus>,
+    bus: &'a Bus<'a>,
 }
 
 trait AsU8Array<const W: usize> {
@@ -103,15 +125,20 @@ impl AsU16Array<2> for u32 {
     }
 }
 
-impl Mmu {
-    pub fn new(bus: Arc<Bus>) -> Self {
+impl<'a> Mmu<'a> {
+    pub fn new(bus: &'a Bus<'a>, reservation: &'a AtomicU32) -> Self {
         Self {
+            reservation,
             d_cache: Cache::new(),
             i_cache: Cache::new(),
             attr: Cache::new(),
             tlb: Cache::new(),
             bus,
         }
+    }
+
+    pub fn reservation(&self) -> &AtomicU32 {
+        &self.reservation
     }
 
     #[inline(always)]
@@ -329,13 +356,27 @@ impl Mmu {
     }
 
     #[inline(always)]
-    pub fn load_word_atomic(&mut self, _addr: u32) -> MmuResult<u32> {
-        todo!()
+    pub fn load_reserved(&mut self, _addr: u32) -> MmuResult<u32> {
+        // TODO address translation
+        // TODO check physical address attributes about reservability
+
+        let reservation_set = addr_to_reservation_set(_addr);
+
+        // register reservation
+        self.reservation.store(reservation_set, Ordering::Relaxed);
+        Ok(self.bus.load_word(_addr)?) // load directly from bus
     }
 
     #[inline(always)]
-    pub fn store_word_atomic(&mut self, _addr: u32) -> MmuResult<()> {
-        todo!()
+    pub fn store_conditional(&mut self, _addr: u32, _val: u32) -> MmuResult<u32> {
+        let reservation_set = addr_to_reservation_set(_addr);
+        if self.reservation.load(Ordering::Relaxed) != addr_to_reservation_set(_addr) {
+            Ok(1) // indicates failure
+        } else {
+            Ok(self
+                .bus
+                .store_conditional(_addr, _val, &self.reservation, reservation_set)?)
+        }
     }
 
     #[inline(always)]

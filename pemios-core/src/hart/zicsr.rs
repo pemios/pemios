@@ -21,7 +21,7 @@ pub trait Zicsr {
     fn csrrci(&mut self, op: &Operation) -> Conclusion;
 }
 
-impl Zicsr for Hart {
+impl<'a> Zicsr for Hart<'a> {
     #[inline(always)]
     fn csrrw(&mut self, _op: &Operation) -> Conclusion {
         todo!()

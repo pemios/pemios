@@ -7,14 +7,17 @@
 //
 // Copyright © 2022 mumblingdrunkard
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::atomic::AtomicU32,
+};
 
 use fnv::FnvHashMap;
 
 use crate::memory::{
     self,
     main::Main,
-    mapping::{Mapping, MemoryError, MemoryResult, Properties},
+    mapping::{Mapping, MemoryError, MemoryResult, Properties, Reservability, SendSyncMapping},
 };
 
 #[derive(Debug)]
@@ -28,9 +31,51 @@ impl From<MemoryError> for BusError {
     }
 }
 
-pub struct Bus {
+pub struct Builder<'a> {
+    main: Option<Main<'a>>,
+    map: FnvHashMap<u32, (u32, &'a dyn SendSyncMapping<'a>)>,
+}
+
+impl<'a> Builder<'a> {
+    pub fn with_mapping(mut self, mapping: &'a dyn SendSyncMapping<'a>) -> Self {
+        let props = mapping.properties();
+        for i in 0..props.frame_count() {
+            if self.map.contains_key(&(props.base_frame() + i as u32)) {
+                panic!("Tried to build bus with overlapping mappings!");
+            }
+
+            self.map
+                .insert(props.base_frame() + i as u32, (props.base_frame(), mapping));
+        }
+
+        self
+    }
+
+    pub fn with_main_memory(mut self, frame_count: u32) -> Self {
+        if self.main.is_some() {
+            panic!("Tried to build bus with main memory twice!");
+        }
+
+        self.main.replace(Main::new(0, frame_count));
+
+        self
+    }
+
+    pub fn build(self) -> Bus<'a> {
+        if self.main.is_none() {
+            panic!("Tried to build bus without main memory!")
+        }
+
+        Bus {
+            main: self.main.unwrap(),
+            map: self.map,
+        }
+    }
+}
+
+pub struct Bus<'a> {
     /// The main memory segment starts at address 0 and has some size.
-    main: Main,
+    main: Main<'a>,
 
     #[allow(unused)]
     /// map[fnum] should contain (base_frame_number, mapping).
@@ -49,21 +94,22 @@ pub struct Bus {
     /// may be located at a very different offset.
     ///
     /// This map does not have exclusive ownership of the mapping, and mappings
-    /// at different frame numbers may have different implementations, hence the
-    /// Arc<Box<dyn ...>>
-    map: FnvHashMap<u32, (u32, Arc<Box<dyn Mapping>>)>,
+    /// at different frame numbers may have different implementations.
+    /// We also require that these mappings are safe to interact with across
+    /// threads, hence the &'a dyn SendSyncMapping.
+    map: FnvHashMap<u32, (u32, &'a dyn SendSyncMapping<'a>)>,
 }
 
-impl Bus {
-    pub fn new(pages: usize) -> Self {
-        Self {
-            main: Main::new(pages),
+impl<'a> Bus<'a> {
+    pub fn builder() -> Builder<'a> {
+        Builder {
+            main: None,
             map: HashMap::default(),
         }
     }
 
-    pub fn with_mapping(self, _starting_frame_number: u32, _region: Arc<Box<dyn Mapping>>) -> Self {
-        todo!("Add mapping to map")
+    pub fn main_memory_size(&self) -> u32 {
+        self.main.properties().frame_count() * 4096
     }
 
     pub fn set_mm(&self, data: &[u8]) -> MemoryResult<usize> {
@@ -71,7 +117,7 @@ impl Bus {
     }
 }
 
-impl Mapping for Bus {
+impl<'a> Mapping<'a> for Bus<'a> {
     fn block_write(&self, offset: u32, src: &[u8]) -> MemoryResult<usize> {
         if offset & 0x80000000 == 0 {
             self.main.block_write(offset, src)
@@ -126,7 +172,7 @@ impl Mapping for Bus {
         todo!()
     }
 
-    fn store_half_word(&self, _offset: u32, _half_word: u16) -> MemoryResult<()> {
+    fn store_half_word(&self, _offset: u32, _jalf_word: u16) -> MemoryResult<()> {
         todo!()
     }
 
@@ -146,11 +192,13 @@ impl Mapping for Bus {
         todo!()
     }
 
-    fn load_reserved(&self, _offset: u32, _src: u32) -> MemoryResult<u32> {
-        todo!()
-    }
-
-    fn store_conditional(&self, _offset: u32, _src: u32) -> MemoryResult<u32> {
+    fn store_conditional(
+        &self,
+        _offset: u32,
+        _src: u32,
+        _reservation: &AtomicU32,
+        _should_be: u32,
+    ) -> MemoryResult<u32> {
         todo!()
     }
 
@@ -195,10 +243,25 @@ impl Mapping for Bus {
     }
 
     fn properties(&self) -> Properties {
-        Properties::new(0xfffff)
+        Properties::new(0, 0xfffff)
     }
 
-    fn register_store_callback(&self, _f: Box<dyn Fn(u32)>) {
-        todo!()
+    fn register_reservation_set(&'a self, set: &'a AtomicU32) {
+        self.main.register_reservation_set(set);
+        let mut seen = HashSet::new();
+        for (_frame_number, (base, mapping)) in self.map.iter() {
+            if seen.contains(base) {
+                // this is an alias and we should not add the callback multiple times
+                continue;
+            }
+
+            seen.insert(*base);
+
+            if mapping.attributes().reservability() == Reservability::None {
+                continue;
+            }
+
+            mapping.register_reservation_set(set);
+        }
     }
 }

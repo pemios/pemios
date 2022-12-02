@@ -7,20 +7,27 @@
 //
 // Copyright © 2022 mumblingdrunkard
 
-use std::sync::Mutex;
+use std::{
+    ops::RangeInclusive,
+    sync::{atomic::AtomicU32, Mutex},
+};
+
+use crate::hart::mmu::{helper_check_reservation, helper_invalidate_reservations};
 
 use super::mapping::{Mapping, MemoryError, MemoryResult, Pma, Properties};
 
 type Frame = [u32; 1024];
 
 /// A main memory region that supports all memory operations
-pub struct Main {
+pub struct Main<'a> {
+    base_frame: u32,
     frames: Vec<Mutex<Frame>>,
+    reservations: Mutex<Vec<&'a AtomicU32>>,
 }
 
-impl Main {
-    fn store<const W: usize>(&self, offset: u32, val: u32) -> MemoryResult<()> {
-        assert!(matches!(W, 1 | 2 | 4), "Store width must be 1, 2, or 4");
+impl<'a> Main<'a> {
+    fn check_offset<const W: usize>(&self, offset: u32) -> MemoryResult<(usize, usize)> {
+        assert!(matches!(W, 1 | 2 | 4), "Width must be 1, 2, or 4");
 
         if offset & (W as u32 - 1) != 0 {
             return Err(MemoryError::StoreMisaligned {
@@ -30,12 +37,29 @@ impl Main {
         }
 
         let pfn = offset as usize >> 12;
-        let b = offset as usize & 0xfff;
+        let b = (offset as usize & 0xfff) >> (W / 2); // 4 / 2 = 2, 2/2 = 1, 1/2 = 0
 
         if pfn >= self.frames.len() {
             return Err(MemoryError::OutOfBoundsAccess { offset });
         }
 
+        Ok((pfn, b))
+    }
+
+    fn invalidate_reservation_range(&self, should_be: RangeInclusive<u32>) {
+        self.reservations
+            .lock()
+            .and_then(|g| {
+                should_be.for_each(|set| helper_invalidate_reservations(g.as_ref(), set));
+
+                Ok(())
+            })
+            .expect("Failed to lock reservation sets for invalidation!");
+    }
+
+    fn store<const W: usize>(&self, offset: u32, val: u32) -> MemoryResult<()> {
+        assert!(matches!(W, 1 | 2 | 4), "Store width must be 1, 2, or 4");
+        let (pfn, b) = self.check_offset::<W>(offset)?;
         self.frames
             .get(pfn)
             .and_then(|m| {
@@ -53,12 +77,14 @@ impl Main {
                             4 => unsafe { *g.get_unchecked_mut(b >> 2) = val },
                             _ => unsafe { std::hint::unreachable_unchecked() },
                         }
+
                         Ok(())
                     })
                     .expect(
                         "Tried to acquire frame, but .lock() returned an error.\
 Did a thread exit unexpectedly while holding this Mutex?",
                     );
+
                 Some(())
             })
             .ok_or(MemoryError::OutOfBoundsAccess { offset })
@@ -66,21 +92,7 @@ Did a thread exit unexpectedly while holding this Mutex?",
 
     fn load<const W: usize>(&self, offset: u32) -> Result<u32, MemoryError> {
         assert!(matches!(W, 1 | 2 | 4), "Load width must be 1, 2, or 4");
-
-        if offset & (W as u32 - 1) != 0 {
-            return Err(MemoryError::StoreMisaligned {
-                offset,
-                alignment: W as u32,
-            });
-        }
-
-        let pfn = offset as usize >> 12;
-        let b = offset as usize & 0xfff;
-
-        if pfn >= self.frames.len() {
-            return Err(MemoryError::OutOfBoundsAccess { offset });
-        }
-
+        let (pfn, b) = self.check_offset::<W>(offset)?;
         self.frames
             .get(pfn)
             .and_then(|m| {
@@ -106,45 +118,14 @@ Did a thread exit unexpectedly while holding this Mutex?",
             })
             .ok_or(MemoryError::OutOfBoundsAccess { offset })
     }
-}
 
-impl Mapping for Main {
-    fn block_write(&self, offset: u32, src: &[u8]) -> MemoryResult<usize> {
-        let start = offset as usize >> 12;
-        let end = (offset as usize + src.len() - 1) >> 12;
-
-        if end >= self.frames.len() {
-            return Err(MemoryError::OutOfBoundsAccess { offset });
-        }
-
-        let mut frame_offs = offset as usize & 0xfff; // frame offset
-        let mut src_offs = 0; // data offset
-
-        self.frames[start..=end].iter().for_each(|frame| {
-            frame
-                .lock()
-                .and_then(|mut g| {
-                    let (_, dst, _) = unsafe { g.align_to_mut::<u8>() };
-                    let n = std::cmp::min(dst.len() - frame_offs, src.len() - src_offs);
-                    dst[frame_offs..frame_offs + n].clone_from_slice(&src[src_offs..src_offs + n]);
-                    src_offs += n;
-                    frame_offs = 0;
-
-                    Ok(())
-                })
-                .expect(
-                    "Tried to acquire frame, but .lock() returned an error.\
-Did a thread exit unexpectedly while holding this Mutex?",
-                )
-        });
-
-        assert_eq!(src_offs, src.len(), "Failed to store all elements from src");
-
-        Ok(src_offs)
-    }
-
-    fn block_write_masked(&self, offset: u32, src: &[u8], _mask: &[u8]) -> MemoryResult<usize> {
-        if _mask.len() * 8 < src.len() {
+    fn block_write_internal<const M: bool>(
+        &self,
+        offset: u32,
+        src: &[u8],
+        mask: &[u8],
+    ) -> MemoryResult<usize> {
+        if M && mask.len() * 8 < src.len() {
             panic!("Mask must contain enough bits to mask src!");
         }
 
@@ -169,14 +150,19 @@ Did a thread exit unexpectedly while holding this Mutex?",
                         let mask_index = src_offs + i;
                         let mask_byte = mask_index >> 3;
                         let mask_bit = mask_index & 7;
-                        // Only copies the byte if the mask contains a 1 at the corresponding position
-                        if (unsafe { _mask.get_unchecked(mask_byte) } >> mask_bit) & 1 == 1 {
+                        if !M {
+                            dst[frame_offs..frame_offs + n]
+                                .clone_from_slice(&src[src_offs..src_offs + n]);
+                        } else if (unsafe { mask.get_unchecked(mask_byte) } >> mask_bit) & 1 == 1 {
+                            // if Masked and mask bit is set
                             written += 1;
                             dst[frame_offs + i] = src[src_offs + i];
                         }
                     }
                     src_offs += n;
                     frame_offs = 0;
+
+                    // invalidate reservations
 
                     Ok(())
                 })
@@ -186,9 +172,17 @@ Did a thread exit unexpectedly while holding this Mutex?",
                 )
         });
 
-        // assert_eq!(src_offs, src.len(), "Failed to store all elements from src");
-
         Ok(written)
+    }
+}
+
+impl<'a> Mapping<'a> for Main<'a> {
+    fn block_write(&self, offset: u32, src: &[u8]) -> MemoryResult<usize> {
+        self.block_write_internal::<false>(offset, src, &[])
+    }
+
+    fn block_write_masked(&self, offset: u32, src: &[u8], mask: &[u8]) -> MemoryResult<usize> {
+        self.block_write_internal::<true>(offset, src, mask)
     }
 
     fn block_read(&self, offset: u32, dst: &mut [u8]) -> Result<usize, MemoryError> {
@@ -283,14 +277,6 @@ Did a thread exit unexpectedly while holding this Mutex?",
         self.load::<4>(offset)
     }
 
-    fn load_reserved(&self, _offset: u32, _src: u32) -> Result<u32, MemoryError> {
-        todo!()
-    }
-
-    fn store_conditional(&self, _offset: u32, _src: u32) -> Result<u32, MemoryError> {
-        todo!()
-    }
-
     fn amoswap_w(&self, _offset: u32, _src: u32) -> Result<u32, MemoryError> {
         todo!()
     }
@@ -328,23 +314,69 @@ Did a thread exit unexpectedly while holding this Mutex?",
     }
 
     fn attributes(&self) -> Pma {
-        todo!()
+        Pma::main()
     }
 
     fn properties(&self) -> Properties {
-        Properties::new(self.frames.len())
+        Properties::new(self.base_frame, self.frames.len() as u32)
     }
 
-    fn register_store_callback(&self, _f: Box<dyn Fn(u32)>) {
-        todo!()
+    fn register_reservation_set(&'a self, reservation: &'a AtomicU32) {
+        self.reservations
+            .lock()
+            .and_then(|mut g| {
+                g.push(reservation);
+                Ok(())
+            })
+            .expect("Failed to grab lock to invalidate reservations");
+    }
+
+    fn store_conditional(
+        &self,
+        offset: u32,
+        src: u32,
+        reservation: &AtomicU32,
+        should_be: u32,
+    ) -> MemoryResult<u32> {
+        let (pfn, b) = self.check_offset::<4>(offset)?;
+
+        let success = self.frames[pfn]
+            .lock()
+            .and_then(|mut g| {
+                let success = helper_check_reservation(reservation, should_be);
+                if success == 1 {
+                    // perform the store
+                    g[b] = src;
+
+                    // ... and invalidate reservations
+                    self.reservations
+                        .lock()
+                        .and_then(|g| {
+                            helper_invalidate_reservations(&g, should_be);
+                            Ok(())
+                        })
+                        .expect("Failed to grab lock to invalidate reservations");
+                }
+                Ok(success)
+            })
+            .expect(
+                "Tried to acquire frame, but .lock() returned an error.\
+Did a thread exit unexpectedly while holding this Mutex?",
+            );
+
+        Ok(success)
     }
 }
 
-impl Main {
+impl<'a> Main<'a> {
     /// Create a new main memory with `pages` pages of 4096 bytes each.
-    pub fn new(pages: usize) -> Main {
-        let frames = (0..pages).map(|_| Mutex::new([0; 1024])).collect();
-        Self { frames }
+    pub fn new(base_frame: u32, frame_count: u32) -> Self {
+        let frames = (0..frame_count).map(|_| Mutex::new([0; 1024])).collect();
+        Self {
+            base_frame,
+            frames,
+            reservations: Mutex::new(Vec::new()),
+        }
     }
 }
 
@@ -357,7 +389,7 @@ mod tests {
 
     #[test]
     fn load_store() -> MemoryResult<()> {
-        let m = Main::new(1);
+        let m = Main::new(0, 1);
         m.store_word(0x60, 69)?;
         if let Ok(w) = m.load_word(0x60) {
             assert_eq!(w, 69, "Store or load failed");
@@ -367,7 +399,7 @@ mod tests {
 
     #[test]
     fn block_read_write() -> MemoryResult<()> {
-        let m = Main::new(1);
+        let m = Main::new(0, 1);
         let b = [69; 0x1000];
         let mut c = [0; 0x1000];
         m.block_write(0, &b[..])?;

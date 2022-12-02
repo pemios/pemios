@@ -25,10 +25,11 @@ mod zicsr;
 #[cfg(feature = "zifencei")]
 mod zifencei;
 
+use std::sync::atomic::AtomicU32;
+
 pub use register::Reg;
 
 use register::RegisterFile;
-use std::sync::Arc;
 
 use crate::bus::Bus;
 
@@ -37,20 +38,29 @@ use self::{
     mmu::Mmu,
 };
 
-pub struct Hart {
+pub struct Hart<'a> {
     pc: u32,
     pub reg: RegisterFile,
-    mmu: Mmu,
+    mmu: Mmu<'a>,
     // csr: [u32; 4096],
 }
 
-impl Hart {
-    pub fn new(bus: Arc<Bus>) -> Self {
-        Self {
+impl<'a> Hart<'a> {
+    pub fn new(bus: &'a Bus<'a>, reservation: &'a AtomicU32) -> Self {
+        let hart = Self {
             pc: 0,
             reg: RegisterFile::new(),
-            mmu: Mmu::new(bus),
-        }
+            mmu: Mmu::new(bus, reservation),
+        };
+
+        // can't register here because hart gets moved at the end
+        // bus.register_reservation_invalidation(0, hart.mmu.reservation());
+
+        hart
+    }
+
+    pub fn reservation(&self) -> &AtomicU32 {
+        self.mmu.reservation()
     }
 
     /// Invalid instruction

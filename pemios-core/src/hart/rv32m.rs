@@ -24,7 +24,7 @@ pub trait Rv32m {
 }
 
 #[deny(clippy::integer_arithmetic)]
-impl Rv32m for Hart {
+impl<'a> Rv32m for Hart<'a> {
     #[inline(always)]
     fn mul(&mut self, op: &Operation) -> Conclusion {
         self.reg
@@ -97,7 +97,8 @@ impl Rv32m for Hart {
 
 #[cfg(all(test, feature = "rv32m"))]
 mod tests {
-    use std::sync::Arc;
+
+    use std::sync::atomic::AtomicU32;
 
     use crate::{
         bus::Bus,
@@ -107,14 +108,11 @@ mod tests {
         },
     };
 
-    fn test_hart() -> Hart {
-        let b = Arc::new(Bus::new(0));
-        Hart::new(b)
-    }
-
     #[test]
     fn mul() {
-        let mut h = test_hart();
+        let reservation = &AtomicU32::new(0xffffffff);
+        let bus = &Bus::builder().with_main_memory(1).build();
+        let mut h = Hart::new(bus, reservation);
         h.reg.set(Reg::X1, 4);
         h.reg.set(Reg::X2, 4);
         let op = Operation::new(InstructionKind::Mul, Reg::X1, Reg::X1, Reg::X2, 0);

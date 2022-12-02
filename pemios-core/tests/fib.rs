@@ -12,7 +12,9 @@
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::{cell::Cell, sync::atomic::AtomicU32, thread};
+
+    use pemios_core::memory::{self, mapping::Mapping};
 
     use {
         pemios_core::bus::Bus,
@@ -23,35 +25,89 @@ mod tests {
     };
 
     #[test]
-    fn fib() {
-        // decoded instructions
+    fn mt_fib() {
+        struct Device<'a> {
+            bus: Cell<Option<&'a Bus<'a>>>,
+            mem: memory::main::Main<'a>,
+        }
+
+        impl<'a> Device<'a> {
+            fn new() -> Self {
+                Self {
+                    bus: Cell::new(None),
+                    mem: memory::main::Main::new(0, 1),
+                }
+            }
+
+            fn set_bus(&'a self, bus: &'a Bus<'a>) {
+                self.bus.set(Some(bus));
+            }
+        }
+
         use pemios_core::hart::Hart;
         use std::fs;
 
         let program = fs::read("resources/test_programs/fib").unwrap();
 
-        let bus = Arc::new(Bus::new(1024));
+        let device = Device::new();
+
+        let bus = &Bus::builder()
+            .with_main_memory(2)
+            .with_mapping(&device.mem)
+            .build();
+
+        device.set_bus(bus);
+
         if let Err(_) = bus.set_mm(&program) {
             todo!();
         };
 
-        let mut h = Hart::new(bus);
+        let reservation1 = &AtomicU32::new(0xffffffff);
+        let reservation2 = &AtomicU32::new(0xffffffff);
 
-        h.reg.set(Reg::SP, 0x1000 << 10);
+        thread::scope(|s| {
+            s.spawn(|| {
+                let mut h = Hart::new(bus, reservation1);
+                bus.register_reservation_set(reservation1);
+                // bus.register_reservation_invalidation(0, &h.reservation);
+                h.reg.set(Reg::SP, 0x1000);
 
-        let start = std::time::Instant::now();
+                let start = std::time::Instant::now();
 
-        let mut ctr = 0;
-        loop {
-            ctr += 1;
-            if let Conclusion::Exception(_) = h.execute() {
-                println!("Done with {ctr} instructions! Result: {}", h.reg[Reg::A1]);
-                break;
-            }
-        }
+                let mut ctr = 0;
+                loop {
+                    ctr += 1;
+                    if let Conclusion::Exception(_) = h.execute() {
+                        println!("Done with {ctr} instructions! Result: {}", h.reg[Reg::A1]);
+                        break;
+                    }
+                }
 
-        let end = std::time::Instant::now();
+                let end = std::time::Instant::now();
 
-        println!("pre-decoding took: {:?}", end - start);
+                println!("pre-decoding took: {:?}", end - start);
+            });
+
+            s.spawn(|| {
+                let mut h = Hart::new(bus, reservation2);
+                bus.register_reservation_set(reservation2);
+                h.reg.set(Reg::SP, 0x2000);
+
+                let start = std::time::Instant::now();
+
+                let mut ctr = 0;
+                loop {
+                    ctr += 1;
+                    if let Conclusion::Exception(_) = h.execute() {
+                        println!("Done with {ctr} instructions! Result: {}", h.reg[Reg::A1]);
+                        break;
+                    }
+                }
+
+                let end = std::time::Instant::now();
+
+                println!("pre-decoding took: {:?}", end - start);
+            });
+        });
     }
 }

@@ -24,7 +24,7 @@ pub trait Execute {
     fn execute(&mut self) -> Conclusion;
 }
 
-impl Hart {
+impl<'a> Hart<'a> {
     #[inline(always)]
     fn execute_op(&mut self, op: &Operation) -> Conclusion {
         use super::InstructionKind::*;
@@ -148,7 +148,7 @@ impl Hart {
     }
 }
 
-impl Execute for Hart {
+impl<'a> Execute for Hart<'a> {
     #[allow(unused)]
     #[inline(always)]
     fn execute(&mut self) -> Conclusion {

@@ -16,7 +16,7 @@ pub trait Zifencei {
     fn fencei(&mut self, op: &Operation) -> Conclusion;
 }
 
-impl Zifencei for Hart {
+impl<'a> Zifencei for Hart<'a> {
     #[inline(always)]
     fn fencei(&mut self, _op: &Operation) -> Conclusion {
         todo!()

@@ -7,15 +7,17 @@
 //
 // Copyright © 2022 mumblingdrunkard
 
+use std::sync::atomic::AtomicU32;
+
 #[allow(unused)]
-#[derive(Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum MemoryKind {
     Main = 0,
     Io,
 }
 
 #[allow(unused)]
-#[derive(Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum AmoClass {
     /// No atomics; all atomic operations will fail
     None = 0,
@@ -32,7 +34,7 @@ pub enum AmoClass {
 }
 
 #[allow(unused)]
-#[derive(Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 // TODO For a mapping to be reservable, it must be able to register callbacks when stores occur
 pub enum Reservability {
     /// No reservability; lr and sc instructions are unsupported.
@@ -48,7 +50,7 @@ pub enum Reservability {
 }
 
 #[allow(unused)]
-#[derive(Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Idempotency {
     /// This region is not idempotent and spurious reads or writes must not
     /// occur.
@@ -62,7 +64,7 @@ pub enum Idempotency {
 }
 
 #[allow(unused)]
-#[derive(Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Cacheability {
     /// This region cannot be cached in any way.
     /// All loads and stores must be coherent.
@@ -103,6 +105,10 @@ impl Default for Pma {
 }
 
 impl Pma {
+    pub fn main() -> Self {
+        Self::default()
+    }
+
     pub fn packed(&self) -> PmaPacked {
         let (kind, amo, reservability, idempotency, cacheability) = (
             self.kind as u8,
@@ -119,6 +125,26 @@ impl Pma {
                 | (idempotency << 5)
                 | (cacheability << 6),
         }
+    }
+
+    pub fn kind(&self) -> MemoryKind {
+        self.kind
+    }
+
+    pub fn amo(&self) -> AmoClass {
+        self.amo
+    }
+
+    pub fn reservability(&self) -> Reservability {
+        self.reservability
+    }
+
+    pub fn idpempotency(&self) -> Idempotency {
+        self.idempotency
+    }
+
+    pub fn cacheability(&self) -> Cacheability {
+        self.cacheability
     }
 }
 
@@ -209,15 +235,26 @@ pub type MemoryResult<T> = std::result::Result<T, MemoryError>;
 
 #[allow(unused)]
 pub struct Properties {
-    frames: usize,
+    base_frame: u32,
+    frame_count: u32,
 }
 
 impl Properties {
-    pub fn new(frames: usize) -> Self {
-        Self { frames }
+    pub fn new(base_frame: u32, frame_count: u32) -> Self {
+        Self {
+            base_frame,
+            frame_count,
+        }
+    }
+
+    pub fn base_frame(&self) -> u32 {
+        self.base_frame
+    }
+
+    pub fn frame_count(&self) -> u32 {
+        self.frame_count
     }
 }
-
 #[allow(unused)]
 /// A memory mapping
 ///
@@ -231,7 +268,7 @@ impl Properties {
 /// Streaming devices could for example be implemented with a lock-free queue,
 /// or certain parts of a mapping may be faster to implement with atomics
 /// instead of a Mutex-wrapped array.
-pub trait Mapping {
+pub trait Mapping<'a> {
     /// Intended for writing chunks of bytes from a region of memory.
     ///
     /// `block_write` should work across sequential frames in the same memory
@@ -343,8 +380,17 @@ pub trait Mapping {
     fn load_half_word(&self, offset: u32) -> MemoryResult<u16>;
     fn load_word(&self, offset: u32) -> MemoryResult<u32>;
 
-    fn load_reserved(&self, offset: u32, src: u32) -> MemoryResult<u32>;
-    fn store_conditional(&self, offset: u32, src: u32) -> MemoryResult<u32>;
+    /// Stores `src` at the given offset if `reservation == should_be`.
+    ///
+    /// On success, this function should return Ok(0).
+    /// On failure, this funciton should return Ok(1).
+    fn store_conditional(
+        &self,
+        offset: u32,
+        src: u32,
+        reservation: &AtomicU32,
+        should_be: u32,
+    ) -> MemoryResult<u32>;
 
     fn amoswap_w(&self, offset: u32, src: u32) -> MemoryResult<u32>;
     fn amoadd_w(&self, offset: u32, src: u32) -> MemoryResult<u32>;
@@ -366,5 +412,8 @@ pub trait Mapping {
     /// This is useful for informing reservation sets when devices make changes
     /// to memory or for raising interrupts when operations complete or new
     /// data is available.
-    fn register_store_callback(&self, f: Box<dyn Fn(u32)>);
+    fn register_reservation_set(&'a self, reservation: &'a AtomicU32);
 }
+
+pub trait SendSyncMapping<'a>: Send + Sync + Mapping<'a> {}
+impl<'a, T> SendSyncMapping<'a> for T where T: Send + Sync + Mapping<'a> {}
