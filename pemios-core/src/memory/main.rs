@@ -36,14 +36,14 @@ impl<'a> Main<'a> {
             });
         }
 
-        let pfn = offset as usize >> 12;
-        let b = (offset as usize & 0xfff) >> (W / 2); // 4 / 2 = 2, 2/2 = 1, 1/2 = 0
+        let frame_number = offset as usize >> 12;
+        let index = (offset as usize & 0xfff) >> (W / 2); // 4 / 2 = 2, 2/2 = 1, 1/2 = 0
 
-        if pfn >= self.frames.len() {
+        if frame_number >= self.frames.len() {
             return Err(MemoryError::OutOfBoundsAccess { offset });
         }
 
-        Ok((pfn, b))
+        Ok((frame_number, index))
     }
 
     fn invalidate_reservation_range(&self, should_be: RangeInclusive<u32>) {
@@ -59,22 +59,22 @@ impl<'a> Main<'a> {
 
     fn store<const W: usize>(&self, offset: u32, val: u32) -> MemoryResult<()> {
         assert!(matches!(W, 1 | 2 | 4), "Store width must be 1, 2, or 4");
-        let (pfn, b) = self.check_offset::<W>(offset)?;
+        let (frame_number, index) = self.check_offset::<W>(offset)?;
         self.frames
-            .get(pfn)
+            .get(frame_number)
             .and_then(|m| {
                 m.lock()
                     .and_then(|mut g| {
                         match W {
                             1 => unsafe {
                                 let (_, bytes, _) = g.align_to_mut::<u8>();
-                                *bytes.get_unchecked_mut(b) = val as u8
+                                *bytes.get_unchecked_mut(index) = val as u8
                             },
                             2 => unsafe {
                                 let (_, half_words, _) = g.align_to_mut::<u16>();
-                                *half_words.get_unchecked_mut(b >> 1) = val as u16
+                                *half_words.get_unchecked_mut(index) = val as u16
                             },
-                            4 => unsafe { *g.get_unchecked_mut(b >> 2) = val },
+                            4 => unsafe { *g.get_unchecked_mut(index) = val },
                             _ => unsafe { std::hint::unreachable_unchecked() },
                         }
 
@@ -92,29 +92,30 @@ Did a thread exit unexpectedly while holding this Mutex?",
 
     fn load<const W: usize>(&self, offset: u32) -> Result<u32, MemoryError> {
         assert!(matches!(W, 1 | 2 | 4), "Load width must be 1, 2, or 4");
-        let (pfn, b) = self.check_offset::<W>(offset)?;
+        let (frame_number, index) = self.check_offset::<W>(offset)?;
         self.frames
-            .get(pfn)
+            .get(frame_number)
             .and_then(|m| {
-                let b = m
+                let value = m
                     .lock()
                     .and_then(|mut g| match W {
                         1 => unsafe {
                             let (_, bytes, _) = g.align_to_mut::<u8>();
-                            Ok(*bytes.get_unchecked(b) as u32)
+                            Ok(*bytes.get_unchecked(index) as u32)
                         },
                         2 => unsafe {
                             let (_, half_words, _) = g.align_to_mut::<u16>();
-                            Ok(*half_words.get_unchecked(b >> 1) as u32)
+                            Ok(*half_words.get_unchecked(index) as u32)
                         },
-                        4 => unsafe { Ok(*g.get_unchecked(b >> 2)) },
+                        4 => unsafe { Ok(*g.get_unchecked(index)) },
                         _ => unsafe { std::hint::unreachable_unchecked() },
                     })
                     .expect(
                         "Tried to acquire frame, but .lock() returned an error.\
 Did a thread exit unexpectedly while holding this Mutex?",
                     );
-                Some(b)
+
+                Some(value)
             })
             .ok_or(MemoryError::OutOfBoundsAccess { offset })
     }
@@ -162,7 +163,7 @@ Did a thread exit unexpectedly while holding this Mutex?",
                     src_offs += n;
                     frame_offs = 0;
 
-                    // invalidate reservations
+                    // TODO invalidate reservations
 
                     Ok(())
                 })

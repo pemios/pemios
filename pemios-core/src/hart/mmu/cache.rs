@@ -36,22 +36,21 @@ where
 {
     pub fn new() -> Self {
         Self {
-            sets: [Set::new(); 1 << S],
+            sets: [Set::<T, U, S, A, B>::new(); 1 << S],
         }
     }
 
     #[inline(always)]
     pub fn get(&self, addr: u32) -> Option<&T> {
         let addr = Self::addr_from_u32(addr);
-        self.get_block(addr.tag_set())
-            .and_then(|b| Some(b.get(addr.offset())))
+        self.get_block(addr.tag_set()).map(|b| b.get(addr.offset()))
     }
 
     #[inline(always)]
     pub fn get_mut(&mut self, addr: u32) -> Option<(&mut T, &mut U)> {
         let addr = Self::addr_from_u32(addr);
         self.get_block_mut(addr.tag_set())
-            .and_then(|b| Some(b.get_mut(addr.offset())))
+            .map(|b| b.get_mut(addr.offset()))
     }
 
     #[inline(always)]
@@ -78,7 +77,7 @@ where
 
                 let (data, tracker) = block.internal();
 
-                (block_addr, data.clone(), *tracker)
+                (block_addr, *data, *tracker)
             }),
         ))
     }
@@ -106,7 +105,7 @@ where
 
                 let (data, tracker) = block.internal();
 
-                (block_addr, data.clone(), *tracker)
+                (block_addr, *data, *tracker)
             }),
         ))
     }
@@ -151,7 +150,7 @@ where
 
             let (data, tracker) = block.internal();
 
-            Some((block_addr, data.clone(), *tracker))
+            Some((block_addr, *data, *tracker))
         } else {
             None
         }
@@ -174,7 +173,7 @@ where
             let block_addr = tag | set_offset;
             let (data, tracker) = block.internal();
 
-            Ok(Some((block_addr, data.clone(), *tracker)))
+            Ok(Some((block_addr, *data, *tracker)))
         } else {
             Ok(None)
         }

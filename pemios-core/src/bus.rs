@@ -7,12 +7,9 @@
 //
 // Copyright © 2022 mumblingdrunkard
 
-use std::{
-    collections::{HashMap, HashSet},
-    sync::atomic::AtomicU32,
-};
+use std::{collections::HashMap, sync::atomic::AtomicU32};
 
-use fnv::FnvHashMap;
+use fnv::{FnvHashMap, FnvHashSet};
 
 use crate::memory::{
     self,
@@ -248,7 +245,7 @@ impl<'a> Mapping<'a> for Bus<'a> {
 
     fn register_reservation_set(&'a self, set: &'a AtomicU32) {
         self.main.register_reservation_set(set);
-        let mut seen = HashSet::new();
+        let mut seen = FnvHashSet::default();
         for (_frame_number, (base, mapping)) in self.map.iter() {
             if seen.contains(base) {
                 // this is an alias and we should not add the callback multiple times
