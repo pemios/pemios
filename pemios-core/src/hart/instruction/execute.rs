@@ -29,114 +29,115 @@ impl<'a> Hart<'a> {
     fn execute_op(&mut self, op: &Operation) -> Conclusion {
         use super::InstructionKind::*;
         let conclusion = match op.kind {
-            Lui => self.lui(&op),
-            Auipc => self.auipc(&op),
-            Jal => self.jal(&op),
-            Jalr => self.jalr(&op),
-            Beq => self.beq(&op),
-            Bne => self.bne(&op),
-            Blt => self.blt(&op),
-            Bge => self.bge(&op),
-            Bltu => self.bltu(&op),
-            Bgeu => self.bgeu(&op),
+            Lui => self.lui(op),
+            Auipc => self.auipc(op),
 
-            Lb => self.lb(&op),
-            Lh => self.lh(&op),
-            Lw => self.lw(&op),
-            Lbu => self.lbu(&op),
-            Lhu => self.lhu(&op),
-            Sb => self.sb(&op),
-            Sh => self.sh(&op),
-            Sw => self.sw(&op),
+            Jal => self.jal(op),
+            Jalr => self.jalr(op),
 
-            Addi => self.addi(&op),
-            Slti => self.slti(&op),
-            Sltiu => self.sltiu(&op),
-            Xori => self.xori(&op),
-            Ori => self.ori(&op),
-            Andi => self.andi(&op),
-            Slli => self.slli(&op),
-            Srli => self.srli(&op),
-            Srai => self.srai(&op),
+            Beq => self.beq(op),
+            Bne => self.bne(op),
+            Blt => self.blt(op),
+            Bge => self.bge(op),
+            Bltu => self.bltu(op),
+            Bgeu => self.bgeu(op),
 
-            Add => self.add(&op),
-            Sub => self.sub(&op),
-            Sll => self.sll(&op),
-            Slt => self.slt(&op),
-            Sltu => self.sltu(&op),
-            Xor => self.xor(&op),
-            Srl => self.srl(&op),
-            Sra => self.sra(&op),
-            Or => self.or(&op),
-            And => self.and(&op),
+            Lb => self.lb(op),
+            Lh => self.lh(op),
+            Lw => self.lw(op),
+            Lbu => self.lbu(op),
+            Lhu => self.lhu(op),
+            Sb => self.sb(op),
+            Sh => self.sh(op),
+            Sw => self.sw(op),
 
-            Fence => self.fence(&op),
+            Addi => self.addi(op),
+            Slti => self.slti(op),
+            Sltiu => self.sltiu(op),
+            Xori => self.xori(op),
+            Ori => self.ori(op),
+            Andi => self.andi(op),
+            Slli => self.slli(op),
+            Srli => self.srli(op),
+            Srai => self.srai(op),
 
-            Ecall => self.ecall(&op),
-            Ebreak => self.ebreak(&op),
+            Add => self.add(op),
+            Sub => self.sub(op),
+            Sll => self.sll(op),
+            Slt => self.slt(op),
+            Sltu => self.sltu(op),
+            Xor => self.xor(op),
+            Srl => self.srl(op),
+            Sra => self.sra(op),
+            Or => self.or(op),
+            And => self.and(op),
+
+            Fence => self.fence(op),
+
+            Ecall => self.ecall(op),
+            Ebreak => self.ebreak(op),
 
             #[cfg(feature = "zifencei")]
-            Fencei => self.fencei(&op),
+            Fencei => self.fencei(op),
 
             #[cfg(feature = "zicsr")]
-            CsrRw => self.csrrw(&op),
+            CsrRw => self.csrrw(op),
             #[cfg(feature = "zicsr")]
-            CsrRs => self.csrrs(&op),
+            CsrRs => self.csrrs(op),
             #[cfg(feature = "zicsr")]
-            CsrRc => self.csrrc(&op),
+            CsrRc => self.csrrc(op),
             #[cfg(feature = "zicsr")]
-            CsrRwi => self.csrrwi(&op),
+            CsrRwi => self.csrrwi(op),
             #[cfg(feature = "zicsr")]
-            CsrRsi => self.csrrsi(&op),
+            CsrRsi => self.csrrsi(op),
             #[cfg(feature = "zicsr")]
-            CsrRci => self.csrrci(&op),
+            CsrRci => self.csrrci(op),
 
             #[cfg(feature = "rv32m")]
-            Mul => self.mul(&op),
+            Mul => self.mul(op),
             #[cfg(feature = "rv32m")]
-            Mulh => self.mulh(&op),
+            Mulh => self.mulh(op),
             #[cfg(feature = "rv32m")]
-            Mulhsu => self.mulhsu(&op),
+            Mulhsu => self.mulhsu(op),
             #[cfg(feature = "rv32m")]
-            Mulhu => self.mulhu(&op),
+            Mulhu => self.mulhu(op),
             #[cfg(feature = "rv32m")]
-            Div => self.div(&op),
+            Div => self.div(op),
             #[cfg(feature = "rv32m")]
-            Divu => self.divu(&op),
+            Divu => self.divu(op),
             #[cfg(feature = "rv32m")]
-            Rem => self.rem(&op),
+            Rem => self.rem(op),
             #[cfg(feature = "rv32m")]
-            Remu => self.remu(&op),
+            Remu => self.remu(op),
 
             #[cfg(feature = "rv32a")]
-            Lrw => self.lr_w(&op),
+            Lrw => self.lr_w(op),
             #[cfg(feature = "rv32a")]
-            Scw => self.sc_w(&op),
+            Scw => self.sc_w(op),
             #[cfg(feature = "rv32a")]
-            AmoSwapw => self.amoswap_w(&op),
+            AmoSwapw => self.amoswap_w(op),
             #[cfg(feature = "rv32a")]
-            AmoAddw => self.amoadd_w(&op),
+            AmoAddw => self.amoadd_w(op),
             #[cfg(feature = "rv32a")]
-            AmoXorw => self.amoxor_w(&op),
+            AmoXorw => self.amoxor_w(op),
             #[cfg(feature = "rv32a")]
-            AmoAndw => self.amoand_w(&op),
+            AmoAndw => self.amoand_w(op),
             #[cfg(feature = "rv32a")]
-            AmoOrw => self.amoor_w(&op),
+            AmoOrw => self.amoor_w(op),
             #[cfg(feature = "rv32a")]
-            AmoMinw => self.amomin_w(&op),
+            AmoMinw => self.amomin_w(op),
             #[cfg(feature = "rv32a")]
-            AmoMaxw => self.amomax_w(&op),
+            AmoMaxw => self.amomax_w(op),
             #[cfg(feature = "rv32a")]
-            AmoMinuw => self.amominu_w(&op),
+            AmoMinuw => self.amominu_w(op),
             #[cfg(feature = "rv32a")]
-            AmoMaxuw => self.amomaxu_w(&op),
+            AmoMaxuw => self.amomaxu_w(op),
 
-            Invalid => self.inst_invalid(&op),
+            Invalid => self.inst_invalid(op),
         };
 
-        match conclusion {
-            Conclusion::None => self.pc = self.pc.wrapping_add(4),
-            _ => {}
+        if let Conclusion::None = conclusion {
+            self.pc = self.pc.wrapping_add(4)
         };
 
         conclusion
