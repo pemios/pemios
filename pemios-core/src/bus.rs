@@ -36,14 +36,19 @@ pub struct Builder<'a> {
 impl<'a> Builder<'a> {
     pub fn with_mapping(mut self, mapping: &'a dyn SendSyncMapping<'a>) -> Self {
         let props = mapping.properties();
-        for i in 0..props.frame_count() {
-            if self.map.contains_key(&(props.base_frame() + i as u32)) {
-                panic!("Tried to build bus with overlapping mappings!");
-            }
 
-            self.map
-                .insert(props.base_frame() + i as u32, (props.base_frame(), mapping));
+        // the range of frame numbers that are being mapped to
+        let range = (0..props.frame_count()).map(|i| props.base_frame() + i);
+
+        // the mapping overlaps an already established mapping
+        let overlaps = range.clone().any(|i| self.map.contains_key(&i));
+
+        if overlaps {
+            panic!("Tried to build bus with overlapping mappings!");
         }
+
+        let pairs = range.clone().map(|i| (i, (props.base_frame(), mapping)));
+        self.map.extend(pairs);
 
         self
     }
@@ -246,19 +251,15 @@ impl<'a> Mapping<'a> for Bus<'a> {
     fn register_reservation_set(&'a self, set: &'a AtomicU32) {
         self.main.register_reservation_set(set);
         let mut seen = FnvHashSet::default();
-        for (_frame_number, (base, mapping)) in self.map.iter() {
-            if seen.contains(base) {
-                // this is an alias and we should not add the callback multiple times
-                continue;
-            }
-
-            seen.insert(*base);
-
-            if mapping.attributes().reservability() == Reservability::None {
-                continue;
-            }
-
-            mapping.register_reservation_set(set);
-        }
+        self.map
+            .iter()
+            .filter(|(_, (base, mapping))| {
+                let contains = seen.contains(base);
+                seen.insert(*base);
+                (!contains) && mapping.attributes().reservability() != Reservability::None
+            })
+            .for_each(|(_frame_number, (base, mapping))| {
+                mapping.register_reservation_set(set);
+            });
     }
 }
