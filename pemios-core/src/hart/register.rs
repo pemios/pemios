@@ -9,7 +9,6 @@
 
 #[allow(unused)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-#[repr(u8)]
 pub enum Reg {
     /// Description: "Hard-wired zero"
     /// ABI Name: `zero`

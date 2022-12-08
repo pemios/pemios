@@ -11,7 +11,6 @@ use super::OpCode;
 
 #[allow(unused)]
 #[derive(Copy, Clone, Debug, PartialOrd, Ord, PartialEq, Eq)]
-#[repr(u8)]
 pub enum InstructionKind {
     Lui = 0,
     Auipc,
