@@ -68,14 +68,14 @@ pub fn helper_check_reservation(reservation: &AtomicU32, should_be: u32) -> u32 
 
 pub struct Mmu<'a> {
     reservation: &'a AtomicU32,
-    d_cache: cache::Cache<u32, u64, 8, 2, 4>,
-    i_cache: cache::Cache<Operation, (), 8, 2, 4>,
+    d_cache: Box<cache::Cache<u32, u64, 8, 2, 4>>,
+    i_cache: Box<cache::Cache<Operation, (), 8, 2, 4>>,
     // only one element per cache line as it makes little sense to block-fetch memory attributes
     #[allow(unused)]
-    attr: cache::Cache<PmaPacked, (), 12, 3, 0>,
+    attr: Box<cache::Cache<PmaPacked, (), 12, 3, 0>>,
     // only one element per cache line as block-fetching translations also makes no sense
     #[allow(unused)]
-    tlb: cache::Cache<Pte, (), 12, 3, 0>,
+    tlb: Box<cache::Cache<Pte, (), 12, 3, 0>>,
     bus: &'a Bus<'a>,
 }
 
@@ -129,16 +129,16 @@ impl<'a> Mmu<'a> {
     pub fn new(bus: &'a Bus<'a>, reservation: &'a AtomicU32) -> Self {
         Self {
             reservation,
-            d_cache: Cache::new(),
-            i_cache: Cache::new(),
-            attr: Cache::new(),
-            tlb: Cache::new(),
+            d_cache: Box::new(Cache::new()),
+            i_cache: Box::new(Cache::new()),
+            attr: Box::new(Cache::new()),
+            tlb: Box::new(Cache::new()),
             bus,
         }
     }
 
     pub fn reservation(&self) -> &AtomicU32 {
-        &self.reservation
+        self.reservation
     }
 
     #[inline(always)]
@@ -153,7 +153,7 @@ impl<'a> Mmu<'a> {
     }
 
     #[inline(always)]
-    fn load_physical<const W: usize>(&mut self, addr: u32) -> MmuResult<u32> {
+    fn load_physical<const W: u8>(&mut self, addr: u32) -> MmuResult<u32> {
         assert!(matches!(W, 1 | 2 | 4), "Load width must be 1, 2, or 4");
 
         if W == 4 && addr & 3 != 0 {
@@ -209,7 +209,7 @@ impl<'a> Mmu<'a> {
     }
 
     #[inline(always)]
-    fn load<const W: usize>(&mut self, addr: u32) -> MmuResult<u32> {
+    fn load<const W: u8>(&mut self, addr: u32) -> MmuResult<u32> {
         assert!(matches!(W, 1 | 2 | 4), "Load width must be 1, 2, or 4!");
 
         // TODO Address translation
@@ -266,7 +266,7 @@ impl<'a> Mmu<'a> {
     }
 
     #[inline(always)]
-    fn store_physical<const W: usize>(&mut self, addr: u32, val: u32) -> MmuResult<()> {
+    fn store_physical<const W: u8>(&mut self, addr: u32, val: u32) -> MmuResult<()> {
         assert!(matches!(W, 1 | 2 | 4), "Load width must be 1, 2, or 4");
 
         if W == 4 && addr & 3 != 0 {
@@ -276,7 +276,6 @@ impl<'a> Mmu<'a> {
         }
 
         // fast path, if it is in cache, it's cacheable
-
         if let Some((target, tracker)) = self.d_cache.get_mut(addr >> 2) {
             if W == 4 {
                 *target = val.to_le();
@@ -330,7 +329,7 @@ impl<'a> Mmu<'a> {
     }
 
     #[inline(always)]
-    fn store<const W: usize>(&mut self, addr: u32, val: u32) -> MmuResult<()> {
+    fn store<const W: u8>(&mut self, addr: u32, val: u32) -> MmuResult<()> {
         assert!(matches!(W, 1 | 2 | 4), "Load width must be 1, 2, or 4");
 
         if false {
@@ -375,7 +374,7 @@ impl<'a> Mmu<'a> {
         } else {
             Ok(self
                 .bus
-                .store_conditional(_addr, _val, &self.reservation, reservation_set)?)
+                .store_conditional(_addr, _val, self.reservation, reservation_set)?)
         }
     }
 
