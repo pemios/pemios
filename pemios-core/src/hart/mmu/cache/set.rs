@@ -63,10 +63,10 @@ where
         F: Fn(&mut [T; 1 << B]) -> Result<O, E>,
     {
         if let Some(i) = self.tags.iter().position(|&t| t == tag) {
-            return Ok((&self.blocks[i], None));
+            Ok((&self.blocks[i], None))
         } else {
-            let (i, victim) = self.insert_with(tag, f)?;
-            Ok((unsafe { self.blocks.get_unchecked(i) }, victim))
+            let (inserted, victim) = self.insert_with(tag, f)?;
+            Ok((inserted, victim))
         }
     }
 
@@ -82,8 +82,8 @@ where
         if let Some(i) = self.tags.iter().position(|&t| t == tag) {
             return Ok((&mut self.blocks[i], None));
         } else {
-            let (i, victim) = self.insert_with(tag, f)?;
-            Ok((unsafe { self.blocks.get_unchecked_mut(i) }, victim))
+            let (inserted, victim) = self.insert_with(tag, f)?;
+            Ok((inserted, victim))
         }
     }
 
@@ -93,9 +93,9 @@ where
         &mut self,
         tag: Tag<S, B>,
         block: Block<T, U, B>,
-    ) -> (usize, Option<(Tag<S, B>, Block<T, U, B>)>) {
+    ) -> (&mut Block<T, U, B>, Option<(Tag<S, B>, Block<T, U, B>)>) {
         // search for empty slot
-        let v = self
+        let idx = self
             .tags
             .iter()
             .position(|&t| t.is_invalid())
@@ -107,14 +107,14 @@ where
                 res
             });
 
-        let victim_tag = self.tags[v];
-        let victim_block = self.blocks[v];
-        self.tags[v] = tag;
-        self.blocks[v] = block;
+        let victim_tag = self.tags[idx];
+        let victim_block = self.blocks[idx];
+        self.tags[idx] = tag;
+        self.blocks[idx] = block;
 
         (
-            v,
-            (victim_tag.is_valid() && self.dirty[v]).then_some((victim_tag, victim_block)),
+            &mut self.blocks[idx],
+            (victim_tag.is_valid() && self.dirty[idx]).then_some((victim_tag, victim_block)),
         )
     }
 
@@ -123,11 +123,11 @@ where
         &mut self,
         tag: Tag<S, B>,
         f: F,
-    ) -> Result<(usize, Option<(Tag<S, B>, Block<T, U, B>)>), E>
+    ) -> Result<(&mut Block<T, U, B>, Option<(Tag<S, B>, Block<T, U, B>)>), E>
     where
         F: Fn(&mut [T; 1 << B]) -> Result<O, E>,
     {
-        let v = self
+        let idx = self
             .tags
             .iter()
             .position(|&t| t.is_invalid() || t == tag)
@@ -139,15 +139,15 @@ where
                 res
             });
 
-        let victim_tag = self.tags[v];
-        let victim_block = self.blocks[v];
+        let victim_tag = self.tags[idx];
+        let victim_block = self.blocks[idx];
 
-        self.tags[v] = tag;
-        f(&mut self.blocks[v].internal_mut().0)?;
+        self.tags[idx] = tag;
+        f(&mut self.blocks[idx].internal_mut().0)?;
 
         Ok((
-            v,
-            (victim_tag.is_valid() && self.dirty[v]).then_some((victim_tag, victim_block)),
+            &mut self.blocks[idx],
+            (victim_tag.is_valid() && self.dirty[idx]).then_some((victim_tag, victim_block)),
         ))
     }
 }

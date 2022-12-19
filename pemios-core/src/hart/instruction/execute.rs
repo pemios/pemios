@@ -7,159 +7,283 @@
 //
 // Copyright © 2022 mumblingdrunkard
 
-use crate::hart::{rv32i::Rv32i, Hart};
+use std::ops::{BitAnd, BitOr, BitXor};
 
-#[cfg(feature = "rv32a")]
-use crate::hart::rv32a::Rv32a;
-#[cfg(feature = "rv32m")]
-use crate::hart::rv32m::Rv32m;
-#[cfg(feature = "zicsr")]
-use crate::hart::zicsr::Zicsr;
-#[cfg(feature = "zifencei")]
-use crate::hart::zifencei::Zifencei;
+use crate::hart::Hart;
 
-use super::{Conclusion, Operation};
+use super::{types::Conclusion, Instruction};
 
-pub trait Execute {
-    fn execute(&mut self) -> Conclusion;
+pub trait Step {
+    fn step(&mut self) -> Conclusion;
 }
 
-impl<'a> Hart<'a> {
-    #[inline(always)]
-    fn execute_op(&mut self, op: &Operation) -> Conclusion {
-        use super::InstructionKind::*;
-        let conclusion = match op.kind {
-            Lui => self.lui(op),
-            Auipc => self.auipc(op),
+impl Step for Hart<'_> {
+    fn step(&mut self) -> Conclusion {
+        use Instruction::*;
 
-            Jal => self.jal(op),
-            Jalr => self.jalr(op),
-
-            Beq => self.beq(op),
-            Bne => self.bne(op),
-            Blt => self.blt(op),
-            Bge => self.bge(op),
-            Bltu => self.bltu(op),
-            Bgeu => self.bgeu(op),
-
-            Lb => self.lb(op),
-            Lh => self.lh(op),
-            Lw => self.lw(op),
-            Lbu => self.lbu(op),
-            Lhu => self.lhu(op),
-            Sb => self.sb(op),
-            Sh => self.sh(op),
-            Sw => self.sw(op),
-
-            Addi => self.addi(op),
-            Slti => self.slti(op),
-            Sltiu => self.sltiu(op),
-            Xori => self.xori(op),
-            Ori => self.ori(op),
-            Andi => self.andi(op),
-            Slli => self.slli(op),
-            Srli => self.srli(op),
-            Srai => self.srai(op),
-
-            Add => self.add(op),
-            Sub => self.sub(op),
-            Sll => self.sll(op),
-            Slt => self.slt(op),
-            Sltu => self.sltu(op),
-            Xor => self.xor(op),
-            Srl => self.srl(op),
-            Sra => self.sra(op),
-            Or => self.or(op),
-            And => self.and(op),
-
-            Fence => self.fence(op),
-
-            Ecall => self.ecall(op),
-            Ebreak => self.ebreak(op),
-
-            #[cfg(feature = "zifencei")]
-            Fencei => self.fencei(op),
-
-            #[cfg(feature = "zicsr")]
-            CsrRw => self.csrrw(op),
-            #[cfg(feature = "zicsr")]
-            CsrRs => self.csrrs(op),
-            #[cfg(feature = "zicsr")]
-            CsrRc => self.csrrc(op),
-            #[cfg(feature = "zicsr")]
-            CsrRwi => self.csrrwi(op),
-            #[cfg(feature = "zicsr")]
-            CsrRsi => self.csrrsi(op),
-            #[cfg(feature = "zicsr")]
-            CsrRci => self.csrrci(op),
-
-            #[cfg(feature = "rv32m")]
-            Mul => self.mul(op),
-            #[cfg(feature = "rv32m")]
-            Mulh => self.mulh(op),
-            #[cfg(feature = "rv32m")]
-            Mulhsu => self.mulhsu(op),
-            #[cfg(feature = "rv32m")]
-            Mulhu => self.mulhu(op),
-            #[cfg(feature = "rv32m")]
-            Div => self.div(op),
-            #[cfg(feature = "rv32m")]
-            Divu => self.divu(op),
-            #[cfg(feature = "rv32m")]
-            Rem => self.rem(op),
-            #[cfg(feature = "rv32m")]
-            Remu => self.remu(op),
-
-            #[cfg(feature = "rv32a")]
-            Lrw => self.lr_w(op),
-            #[cfg(feature = "rv32a")]
-            Scw => self.sc_w(op),
-            #[cfg(feature = "rv32a")]
-            AmoSwapw => self.amoswap_w(op),
-            #[cfg(feature = "rv32a")]
-            AmoAddw => self.amoadd_w(op),
-            #[cfg(feature = "rv32a")]
-            AmoXorw => self.amoxor_w(op),
-            #[cfg(feature = "rv32a")]
-            AmoAndw => self.amoand_w(op),
-            #[cfg(feature = "rv32a")]
-            AmoOrw => self.amoor_w(op),
-            #[cfg(feature = "rv32a")]
-            AmoMinw => self.amomin_w(op),
-            #[cfg(feature = "rv32a")]
-            AmoMaxw => self.amomax_w(op),
-            #[cfg(feature = "rv32a")]
-            AmoMinuw => self.amominu_w(op),
-            #[cfg(feature = "rv32a")]
-            AmoMaxuw => self.amomaxu_w(op),
-
-            Invalid => self.inst_invalid(op),
-        };
-
-        if let Conclusion::None = conclusion {
-            self.pc = self.pc.wrapping_add(4)
-        };
-
-        conclusion
-    }
-
-    #[cfg(test)]
-    pub fn test_execute_op(&mut self, op: &Operation) -> Conclusion {
-        self.execute_op(op)
-    }
-}
-
-impl<'a> Execute for Hart<'a> {
-    #[allow(unused)]
-    #[inline(always)]
-    fn execute(&mut self) -> Conclusion {
-        use super::InstructionKind::*;
-
-        let op = match self.mmu.load_instruction(self.pc) {
+        let inst = match self.mmu.load_instruction(self.pc) {
             Ok(op) => op,
             Err(_) => todo!(),
         };
 
-        self.execute_op(&op)
+        let conclusion = match inst {
+            Lui { rd, imm } => {
+                self.reg[rd] = i32::from(imm) as u32;
+                Conclusion::None
+            }
+            Auipc { rd, imm } => {
+                self.reg[rd] = self.pc.wrapping_add_signed(imm.into());
+                Conclusion::None
+            }
+            Jal { rd, imm } => {
+                let target = self.pc.wrapping_add_signed(imm.into());
+                if target & 3 != 0 {
+                    todo!("Add misaligned jump exception");
+                }
+                self.reg[rd] = self.pc.wrapping_add(4);
+                self.pc = target;
+                Conclusion::Jumped
+            }
+            Jalr { rd, rs1, imm } => {
+                let target = self.reg[rs1].wrapping_add_signed(imm.into()) & 0xfffffffe;
+                if target & 3 != 0 {
+                    todo!("Add misaligned jump exception");
+                }
+                self.reg[rd] = self.pc.wrapping_add(4);
+                self.pc = target;
+                Conclusion::Jumped
+            }
+            Beq { rs1, rs2, imm } => {
+                if self.reg[rs1] != self.reg[rs2] {
+                    return Conclusion::None;
+                }
+
+                let target = self.pc.wrapping_add_signed(imm.into());
+                if target & 3 != 0 {
+                    todo!("Add misaligned jump exception");
+                }
+
+                self.pc = target;
+                Conclusion::Jumped
+            }
+            Bne { rs1, rs2, imm } => {
+                if self.reg[rs1] == self.reg[rs2] {
+                    return Conclusion::None;
+                }
+
+                let target = self.pc.wrapping_add_signed(imm.into());
+                if target & 3 != 0 {
+                    todo!("Add misaligned jump exception");
+                }
+
+                self.pc = target;
+                Conclusion::Jumped
+            }
+            Blt { rs1, rs2, imm } => {
+                if (self.reg[rs1] as i32) >= (self.reg[rs2] as i32) {
+                    return Conclusion::None;
+                }
+
+                let target = self.pc.wrapping_add_signed(imm.into());
+                if target & 3 != 0 {
+                    todo!("Add misaligned jump exception");
+                }
+
+                self.pc = target;
+                Conclusion::Jumped
+            }
+            Bge { rs1, rs2, imm } => {
+                if (self.reg[rs1] as i32) < (self.reg[rs2] as i32) {
+                    return Conclusion::None;
+                }
+
+                let target = self.pc.wrapping_add_signed(imm.into());
+                if target & 3 != 0 {
+                    todo!("Add misaligned jump exception");
+                }
+
+                self.pc = target;
+                Conclusion::Jumped
+            }
+            Bltu { rs1, rs2, imm } => {
+                if self.reg[rs1] >= self.reg[rs2] {
+                    return Conclusion::None;
+                }
+
+                let target = self.pc.wrapping_add_signed(imm.into());
+                if target & 3 != 0 {
+                    todo!("Add misaligned jump exception");
+                }
+
+                self.pc = target;
+                Conclusion::Jumped
+            }
+            Bgeu { rs1, rs2, imm } => {
+                if self.reg[rs1] < self.reg[rs2] {
+                    return Conclusion::None;
+                }
+
+                let target = self.pc.wrapping_add_signed(imm.into());
+                if target & 3 != 0 {
+                    todo!("Add misaligned jump exception");
+                }
+
+                self.pc = target;
+                Conclusion::Jumped
+            }
+
+            Lb { rd, rs1, imm } => todo!(),
+
+            Lh { rd, rs1, imm } => todo!(),
+
+            Lw { rd, rs1, imm } => {
+                let addr = self.reg[rs1].wrapping_add_signed(imm.into());
+                match self.mmu.load_word(addr) {
+                    Ok(val) => {
+                        self.reg[rd] = val;
+                        Conclusion::None
+                    }
+                    Err(e) => todo!("{:?}", e),
+                }
+            }
+
+            Lbu { rd, rs1, imm } => todo!(),
+            Lhu { rd, rs1, imm } => todo!(),
+            Sb { rs1, rs2, imm } => todo!(),
+            Sh { rs1, rs2, imm } => todo!(),
+            Sw { rs1, rs2, imm } => {
+                let addr = self.reg[rs1].wrapping_add_signed(imm.into());
+                match self.mmu.store_word(addr, self.reg[rs2]) {
+                    Ok(_) => Conclusion::None,
+                    Err(e) => todo!("{:?}", e),
+                }
+            }
+
+            Addi { rd, rs1, imm } => {
+                self.reg[rd] = self.reg[rs1].wrapping_add_signed(imm.into());
+                Conclusion::None
+            }
+            Slti { rd, rs1, imm } => {
+                self.reg[rd] = ((self.reg[rs1] as i32) < imm.into()) as u32;
+                Conclusion::None
+            }
+            Sltiu { rd, rs1, imm } => {
+                self.reg[rd] = (self.reg[rs1] < i32::from(imm) as u32) as u32;
+                Conclusion::None
+            }
+            Xori { rd, rs1, imm } => {
+                self.reg[rd] = self.reg[rs1].bitxor(i32::from(imm) as u32);
+                Conclusion::None
+            }
+            Ori { rd, rs1, imm } => {
+                self.reg[rd] = self.reg[rs1].bitor(i32::from(imm) as u32);
+                Conclusion::None
+            }
+            Andi { rd, rs1, imm } => {
+                self.reg[rd] = self.reg[rs1].bitand(i32::from(imm) as u32);
+                Conclusion::None
+            }
+            Slli { rd, rs1, shamt } => {
+                self.reg[rd] = self.reg[rs1] << u32::from(shamt);
+                Conclusion::None
+            }
+            Srli { rd, rs1, shamt } => {
+                self.reg[rd] = self.reg[rs1] >> u32::from(shamt);
+                Conclusion::None
+            }
+            Srai { rd, rs1, shamt } => {
+                self.reg[rd] = (self.reg[rs1] as i32 >> u32::from(shamt)) as u32;
+                Conclusion::None
+            }
+
+            Add { rd, rs1, rs2 } => {
+                self.reg[rd] = self.reg[rs1].wrapping_add(self.reg[rs2]);
+                Conclusion::None
+            }
+            Sub { rd, rs1, rs2 } => {
+                self.reg[rd] = self.reg[rs1].wrapping_sub(self.reg[rs2]);
+                Conclusion::None
+            }
+            Sll { rd, rs1, rs2 } => {
+                self.reg[rd] = self.reg[rs1].wrapping_shl(self.reg[rs2]);
+                Conclusion::None
+            }
+            Slt { rd, rs1, rs2 } => {
+                self.reg[rd] = ((self.reg[rs1] as i32) < (self.reg[rs2] as i32)) as u32;
+                Conclusion::None
+            }
+            Sltu { rd, rs1, rs2 } => {
+                self.reg[rd] = (self.reg[rs1] < self.reg[rs2]) as u32;
+                Conclusion::None
+            }
+            Xor { rd, rs1, rs2 } => {
+                self.reg[rd] = self.reg[rs1].bitxor(self.reg[rs2]);
+                Conclusion::None
+            }
+            Srl { rd, rs1, rs2 } => {
+                self.reg[rd] = self.reg[rs1].wrapping_shr(self.reg[rs2]);
+                Conclusion::None
+            }
+            Sra { rd, rs1, rs2 } => {
+                self.reg[rd] = (self.reg[rs1] as i32).wrapping_shr(self.reg[rs2]) as u32;
+                Conclusion::None
+            }
+            Or { rd, rs1, rs2 } => {
+                self.reg[rd] = self.reg[rs1].bitor(self.reg[rs2]);
+                Conclusion::None
+            }
+            And { rd, rs1, rs2 } => {
+                self.reg[rd] = self.reg[rs1].bitand(self.reg[rs2]);
+                Conclusion::None
+            }
+
+            #[rustfmt::skip]
+            Fence { rd, rs1, pred, succ, mode } => todo!(),
+            Ecall => todo!("Implement ecall"),
+            Ebreak => todo!("Implement ebreak"),
+            Fencei { rd, rs1, imm } => todo!("Implement fencei"),
+            CsrRw { rd, rs1, csr } => todo!(),
+            CsrRs { rd, rs1, csr } => todo!(),
+            CsrRc { rd, rs1, csr } => todo!(),
+            CsrRwi { rd, uimm, csr } => todo!(),
+            CsrRsi { rd, uimm, csr } => todo!(),
+            CsrRci { rd, uimm, csr } => todo!(),
+            Mul { rd, rs1, rs2 } => todo!(),
+            Mulh { rd, rs1, rs2 } => todo!(),
+            Mulhsu { rd, rs1, rs2 } => todo!(),
+            Mulhu { rd, rs1, rs2 } => todo!(),
+            Div { rd, rs1, rs2 } => todo!(),
+            Divu { rd, rs1, rs2 } => todo!(),
+            Rem { rd, rs1, rs2 } => todo!(),
+            Remu { rd, rs1, rs2 } => todo!(),
+            Lrw { rd, rs1, aq, rl } => todo!(),
+            #[rustfmt::skip]
+            Scw { rd, rs1, rs2, aq, rl, } => todo!(),
+            #[rustfmt::skip]
+            AmoSwapw { rd, rs1, rs2, aq, rl, } => todo!(),
+            #[rustfmt::skip]
+            AmoAddw { rd, rs1, rs2, aq, rl, } => todo!(),
+            #[rustfmt::skip]
+            AmoXorw { rd, rs1, rs2, aq, rl, } => todo!(),
+            #[rustfmt::skip]
+            AmoAndw { rd, rs1, rs2, aq, rl, } => todo!(),
+            #[rustfmt::skip]
+            AmoOrw { rd, rs1, rs2, aq, rl, } => todo!(),
+            #[rustfmt::skip]
+            AmoMinw { rd, rs1, rs2, aq, rl, } => todo!(),
+            #[rustfmt::skip]
+            AmoMaxw { rd, rs1, rs2, aq, rl, } => todo!(),
+            #[rustfmt::skip]
+            AmoMinuw { rd, rs1, rs2, aq, rl, } => todo!(),
+            #[rustfmt::skip]
+            AmoMaxuw { rd, rs1, rs2, aq, rl, } => todo!(),
+            Invalid { raw } => todo!("Invalid: {raw:b}"),
+        };
+
+        if let Conclusion::None = conclusion {
+            self.pc = self.pc.wrapping_add(4);
+        }
+
+        conclusion
     }
 }

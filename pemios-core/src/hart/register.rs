@@ -201,6 +201,8 @@ pub enum Reg {
     /// Aliases: `Reg::T6`
     /// Saver: Caller
     X31,
+
+    Ignore,
 }
 
 // Register ABI names
@@ -341,6 +343,11 @@ impl Reg {
 
 impl From<u32> for Reg {
     fn from(r: u32) -> Self {
+        debug_assert!(
+            (0..32).contains(&r),
+            "Register value must be in the range 0..32"
+        );
+
         #[rustfmt::skip]
         const REGISTERS: [Reg; 32] = [
             Reg::X0, Reg::X1, Reg::X2, Reg::X3, Reg::X4, Reg::X5, Reg::X6, Reg::X7, Reg::X8,
@@ -351,7 +358,7 @@ impl From<u32> for Reg {
 
         match r {
             0..=31 => REGISTERS[r as usize],
-            _ => panic!(),
+            _ => unreachable!(),
         }
     }
 }
@@ -365,25 +372,6 @@ impl RegisterFile {
     pub fn new() -> Self {
         Self { reg: [0; 33] }
     }
-
-    #[inline]
-    pub fn set(&mut self, rd: Reg, val: u32) {
-        const LUT: [u8; 32] = {
-            let mut lut = [32; 32];
-            let mut i = 1;
-            while i < 32 {
-                lut[i] = i as u8;
-                i += 1;
-            }
-            lut
-        };
-
-        unsafe {
-            *self
-                .reg
-                .get_unchecked_mut(*LUT.get_unchecked(rd as usize) as usize) = val
-        };
-    }
 }
 
 impl std::ops::Index<Reg> for RegisterFile {
@@ -391,5 +379,11 @@ impl std::ops::Index<Reg> for RegisterFile {
 
     fn index(&self, index: Reg) -> &Self::Output {
         unsafe { self.reg.get_unchecked(index as usize) }
+    }
+}
+
+impl std::ops::IndexMut<Reg> for RegisterFile {
+    fn index_mut(&mut self, index: Reg) -> &mut Self::Output {
+        unsafe { self.reg.get_unchecked_mut(index as usize) }
     }
 }

@@ -14,17 +14,6 @@ pub mod register;
 pub mod sv32;
 mod utils;
 
-mod rv32i;
-
-#[cfg(feature = "rv32a")]
-mod rv32a;
-#[cfg(feature = "rv32m")]
-mod rv32m;
-#[cfg(feature = "zicsr")]
-mod zicsr;
-#[cfg(feature = "zifencei")]
-mod zifencei;
-
 use std::sync::atomic::AtomicU32;
 
 pub use register::Reg;
@@ -33,10 +22,7 @@ use register::RegisterFile;
 
 use crate::bus::Bus;
 
-use self::{
-    instruction::{Conclusion, Operation},
-    mmu::Mmu,
-};
+use self::mmu::Mmu;
 
 pub struct Hart<'a> {
     pc: u32,
@@ -61,13 +47,5 @@ impl<'a> Hart<'a> {
 
     pub fn reservation(&self) -> &AtomicU32 {
         self.mmu.reservation()
-    }
-
-    /// Invalid instruction
-    /// Not a part of spec, but included for cases when decoding does not recognise the
-    /// instruction.
-    #[inline(always)]
-    fn inst_invalid(&mut self, op: &Operation) -> Conclusion {
-        panic!("Executed invalid instruction! {:?}", op.kind());
     }
 }

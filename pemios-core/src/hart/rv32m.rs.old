@@ -28,16 +28,16 @@ impl<'a> Rv32m for Hart<'a> {
     #[inline(always)]
     fn mul(&mut self, op: &Operation) -> Conclusion {
         self.reg
-            .set(op.rd(), self.reg[op.rs1()].wrapping_mul(self.reg[op.rs2()]));
+            .set(op.rd, self.reg[op.rs1].wrapping_mul(self.reg[op.rs2]));
         Conclusion::None
     }
 
     #[inline(always)]
     fn mulh(&mut self, op: &Operation) -> Conclusion {
         self.reg.set(
-            op.rd(),
-            ((self.reg[op.rs1()] as i32 as i64).wrapping_mul(self.reg[op.rs2()] as i32 as i64)
-                >> 32) as u32,
+            op.rd,
+            ((self.reg[op.rs1] as i32 as i64).wrapping_mul(self.reg[op.rs2] as i32 as i64) >> 32)
+                as u32,
         );
         Conclusion::None
     }
@@ -45,9 +45,9 @@ impl<'a> Rv32m for Hart<'a> {
     #[inline(always)]
     fn mulhsu(&mut self, op: &Operation) -> Conclusion {
         self.reg.set(
-            op.rd(),
-            ((self.reg[op.rs1()] as i32 as i64).wrapping_mul(self.reg[op.rs2()] as u64 as i64)
-                >> 32) as u32,
+            op.rd,
+            ((self.reg[op.rs1] as i32 as i64).wrapping_mul(self.reg[op.rs2] as u64 as i64) >> 32)
+                as u32,
         );
         Conclusion::None
     }
@@ -55,8 +55,8 @@ impl<'a> Rv32m for Hart<'a> {
     #[inline(always)]
     fn mulhu(&mut self, op: &Operation) -> Conclusion {
         self.reg.set(
-            op.rd(),
-            ((self.reg[op.rs1()] as u64).wrapping_mul(self.reg[op.rs2()] as u64) >> 32) as u32,
+            op.rd,
+            ((self.reg[op.rs1] as u64).wrapping_mul(self.reg[op.rs2] as u64) >> 32) as u32,
         );
         Conclusion::None
     }
@@ -64,9 +64,8 @@ impl<'a> Rv32m for Hart<'a> {
     #[inline(always)]
     fn div(&mut self, op: &Operation) -> Conclusion {
         self.reg.set(
-            op.rd(),
-            (self.reg[op.rs1()] as i32 as i64).wrapping_div(self.reg[op.rs2()] as i32 as i64)
-                as u32,
+            op.rd,
+            (self.reg[op.rs1] as i32 as i64).wrapping_div(self.reg[op.rs2] as i32 as i64) as u32,
         );
         Conclusion::None
     }
@@ -74,15 +73,15 @@ impl<'a> Rv32m for Hart<'a> {
     #[inline(always)]
     fn divu(&mut self, op: &Operation) -> Conclusion {
         self.reg
-            .set(op.rd(), self.reg[op.rs1()].wrapping_div(self.reg[op.rs2()]));
+            .set(op.rd, self.reg[op.rs1].wrapping_div(self.reg[op.rs2]));
         Conclusion::None
     }
 
     #[inline(always)]
     fn rem(&mut self, op: &Operation) -> Conclusion {
         self.reg.set(
-            op.rd(),
-            (self.reg[op.rs1()] as i32).wrapping_rem(self.reg[op.rs2()] as i32) as u32,
+            op.rd,
+            (self.reg[op.rs1] as i32).wrapping_rem(self.reg[op.rs2] as i32) as u32,
         );
         Conclusion::None
     }
@@ -90,7 +89,7 @@ impl<'a> Rv32m for Hart<'a> {
     #[inline(always)]
     fn remu(&mut self, op: &Operation) -> Conclusion {
         self.reg
-            .set(op.rd(), self.reg[op.rs1()].wrapping_rem(self.reg[op.rs2()]));
+            .set(op.rd, self.reg[op.rs1].wrapping_rem(self.reg[op.rs2]));
         Conclusion::None
     }
 }

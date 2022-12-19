@@ -19,7 +19,7 @@ use crate::{
 
 use self::cache::Cache;
 
-use super::{instruction::Operation, sv32::Pte};
+use super::{instruction::Instruction, sv32::Pte};
 
 mod cache;
 
@@ -69,7 +69,7 @@ pub fn helper_check_reservation(reservation: &AtomicU32, should_be: u32) -> u32 
 pub struct Mmu<'a> {
     reservation: &'a AtomicU32,
     d_cache: Box<cache::Cache<u32, u64, 8, 2, 4>>,
-    i_cache: Box<cache::Cache<Operation, (), 8, 2, 4>>,
+    i_cache: Box<cache::Cache<Instruction, (), 8, 2, 4>>,
     // only one element per cache line as it makes little sense to block-fetch memory attributes
     #[allow(unused)]
     attr: Box<cache::Cache<PmaPacked, (), 12, 3, 0>>,
@@ -235,7 +235,7 @@ impl<'a> Mmu<'a> {
     }
 
     #[inline(always)]
-    pub fn load_instruction(&mut self, addr: u32) -> MmuResult<Operation> {
+    pub fn load_instruction(&mut self, addr: u32) -> MmuResult<Instruction> {
         // TODO Address translation
         // TODO Check user mode
         // TODO Check read permissions
@@ -248,10 +248,13 @@ impl<'a> Mmu<'a> {
             return Ok(op);
         }
 
-        let missing = |x: &mut [Operation; 16]| -> memory::mapping::MemoryResult<()> {
+        let missing = |x: &mut [Instruction; 16]| -> memory::mapping::MemoryResult<()> {
             let mut raw = [0u32; 16];
             let (_, dst, _) = unsafe { raw.align_to_mut::<u8>() };
-            self.bus.block_read(addr & 0xffffffc0, dst)?;
+            match self.bus.block_read(addr & 0xffffffc0, dst) {
+                Ok(_) => {}
+                Err(e) => return Err(e),
+            };
 
             x.iter_mut()
                 .zip(raw.into_iter())

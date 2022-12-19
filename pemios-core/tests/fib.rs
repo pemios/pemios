@@ -14,14 +14,14 @@
 mod tests {
     use std::{cell::Cell, sync::atomic::AtomicU32, thread};
 
-    use pemios_core::memory::{self, mapping::Mapping};
+    use pemios_core::{
+        hart::instruction::execute::Step,
+        memory::{self, mapping::Mapping},
+    };
 
     use {
         pemios_core::bus::Bus,
-        pemios_core::hart::{
-            instruction::{Conclusion, Execute},
-            Reg,
-        },
+        pemios_core::hart::{instruction::Conclusion, Reg},
     };
 
     #[test]
@@ -58,7 +58,7 @@ mod tests {
 
         device.set_bus(bus);
 
-        if let Err(_) = bus.set_mm(&program) {
+        if bus.set_mm(&program).is_err() {
             todo!();
         };
 
@@ -70,43 +70,49 @@ mod tests {
                 let mut h = Hart::new(bus, reservation1);
                 bus.register_reservation_set(reservation1);
                 // bus.register_reservation_invalidation(0, &h.reservation);
-                h.reg.set(Reg::SP, 0x1000);
+                h.reg[Reg::SP] = 0x1000;
 
                 let start = std::time::Instant::now();
 
                 let mut ctr = 0;
                 loop {
                     ctr += 1;
-                    if let Conclusion::Exception(_) = h.execute() {
-                        println!("Done with {ctr} instructions! Result: {}", h.reg[Reg::A1]);
+                    if let Conclusion::Exception(_) = h.step() {
+                        break;
+                    }
+
+                    if ctr > 200000000 {
                         break;
                     }
                 }
 
                 let end = std::time::Instant::now();
 
-                println!("pre-decoding took: {:?}", end - start);
+                println!("fib: took {:?}", end - start);
             });
 
             s.spawn(|| {
                 let mut h = Hart::new(bus, reservation2);
                 bus.register_reservation_set(reservation2);
-                h.reg.set(Reg::SP, 0x2000);
+                h.reg[Reg::SP] = 0x2000;
 
                 let start = std::time::Instant::now();
 
                 let mut ctr = 0;
                 loop {
                     ctr += 1;
-                    if let Conclusion::Exception(_) = h.execute() {
-                        println!("Done with {ctr} instructions! Result: {}", h.reg[Reg::A1]);
+                    if let Conclusion::Exception(_) = h.step() {
+                        break;
+                    }
+
+                    if ctr > 200000000 {
                         break;
                     }
                 }
 
                 let end = std::time::Instant::now();
 
-                println!("pre-decoding took: {:?}", end - start);
+                println!("fib: took {:?}", end - start);
             });
         });
     }

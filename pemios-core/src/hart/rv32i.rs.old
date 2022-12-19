@@ -154,14 +154,14 @@ impl<'a> Rv32i for Hart<'a> {
     // Load upper immediate
     #[inline(always)]
     fn lui(&mut self, op: &Operation) -> Conclusion {
-        self.reg.set(op.rd(), op.imm());
+        self.reg.set(op.rd, op.imm());
         Conclusion::None
     }
 
     // Add upper immediate to program counter
     #[inline(always)]
     fn auipc(&mut self, op: &Operation) -> Conclusion {
-        self.reg.set(op.rd(), self.pc.wrapping_add(op.imm()));
+        self.reg.set(op.rd, self.pc.wrapping_add(op.imm()));
         Conclusion::None
     }
 
@@ -180,14 +180,14 @@ impl<'a> Rv32i for Hart<'a> {
         let linked = self.pc.wrapping_add(4);
 
         self.pc = target;
-        self.reg.set(op.rd(), linked);
+        self.reg.set(op.rd, linked);
         Conclusion::Jumped
     }
 
     // Jump and link register
     #[inline(always)]
     fn jalr(&mut self, op: &Operation) -> Conclusion {
-        let target = self.reg[op.rs1()].wrapping_add(op.imm()) & 0xfffffffe;
+        let target = self.reg[op.rs1].wrapping_add(op.imm()) & 0xfffffffe;
 
         if target & 0b11 != 0 {
             // "The JAL and JALR instructions will generate an
@@ -199,14 +199,14 @@ impl<'a> Rv32i for Hart<'a> {
         let linked = self.pc.wrapping_add(4);
 
         self.pc = target;
-        self.reg.set(op.rd(), linked);
+        self.reg.set(op.rd, linked);
         Conclusion::Jumped
     }
 
     /// Branch equal
     #[inline(always)]
     fn beq(&mut self, op: &Operation) -> Conclusion {
-        if self.reg[op.rs1()] != self.reg[op.rs2()] {
+        if self.reg[op.rs1] != self.reg[op.rs2] {
             return Conclusion::None;
         }
 
@@ -226,7 +226,7 @@ impl<'a> Rv32i for Hart<'a> {
     /// Branch not equal
     #[inline(always)]
     fn bne(&mut self, op: &Operation) -> Conclusion {
-        if self.reg[op.rs1()] == self.reg[op.rs2()] {
+        if self.reg[op.rs1] == self.reg[op.rs2] {
             return Conclusion::None;
         }
 
@@ -246,7 +246,7 @@ impl<'a> Rv32i for Hart<'a> {
     /// Branch less than
     #[inline(always)]
     fn blt(&mut self, op: &Operation) -> Conclusion {
-        if (self.reg[op.rs1()] as i32) >= (self.reg[op.rs2()] as i32) {
+        if (self.reg[op.rs1] as i32) >= (self.reg[op.rs2] as i32) {
             return Conclusion::None;
         }
 
@@ -266,7 +266,7 @@ impl<'a> Rv32i for Hart<'a> {
     /// Branch greater than or equal
     #[inline(always)]
     fn bge(&mut self, op: &Operation) -> Conclusion {
-        if (self.reg[op.rs1()] as i32) < (self.reg[op.rs2()] as i32) {
+        if (self.reg[op.rs1] as i32) < (self.reg[op.rs2] as i32) {
             return Conclusion::None;
         }
 
@@ -286,7 +286,7 @@ impl<'a> Rv32i for Hart<'a> {
     /// Branch less than unsigned
     #[inline(always)]
     fn bltu(&mut self, op: &Operation) -> Conclusion {
-        if self.reg[op.rs1()] >= self.reg[op.rs2()] {
+        if self.reg[op.rs1] >= self.reg[op.rs2] {
             return Conclusion::None;
         }
 
@@ -306,7 +306,7 @@ impl<'a> Rv32i for Hart<'a> {
     /// Branch greater than or equal unsigned
     #[inline(always)]
     fn bgeu(&mut self, op: &Operation) -> Conclusion {
-        if self.reg[op.rs1()] < self.reg[op.rs2()] {
+        if self.reg[op.rs1] < self.reg[op.rs2] {
             return Conclusion::None;
         }
 
@@ -326,14 +326,14 @@ impl<'a> Rv32i for Hart<'a> {
     /// Load byte
     #[inline(always)]
     fn lb(&mut self, op: &Operation) -> Conclusion {
-        let _addr = self.reg[op.rs1()].wrapping_add(op.imm());
+        let _addr = self.reg[op.rs1].wrapping_add(op.imm());
         todo!()
     }
 
     /// Load half-word
     #[inline(always)]
     fn lh(&mut self, op: &Operation) -> Conclusion {
-        let addr = self.reg[op.rs1()].wrapping_add(op.imm());
+        let addr = self.reg[op.rs1].wrapping_add(op.imm());
 
         if addr & 1 != 0 {
             todo!() // address-misaligned
@@ -345,7 +345,7 @@ impl<'a> Rv32i for Hart<'a> {
     /// Load word
     #[inline(always)]
     fn lw(&mut self, op: &Operation) -> Conclusion {
-        let addr = self.reg[op.rs1()].wrapping_add(op.imm());
+        let addr = self.reg[op.rs1].wrapping_add(op.imm());
 
         if addr & 3 != 0 {
             todo!() // address-misaligned
@@ -353,7 +353,7 @@ impl<'a> Rv32i for Hart<'a> {
 
         match self.mmu.load_word(addr) {
             Ok(w) => {
-                self.reg.set(op.rd(), w);
+                self.reg.set(op.rd, w);
                 Conclusion::None
             }
             Err(_) => todo!(),
@@ -363,7 +363,7 @@ impl<'a> Rv32i for Hart<'a> {
     /// Load byte unsigned
     #[inline(always)]
     fn lbu(&mut self, op: &Operation) -> Conclusion {
-        let _addr = self.reg[op.rs1()].wrapping_add(op.imm());
+        let _addr = self.reg[op.rs1].wrapping_add(op.imm());
 
         todo!()
     }
@@ -371,7 +371,7 @@ impl<'a> Rv32i for Hart<'a> {
     /// Load half-word unsigned
     #[inline(always)]
     fn lhu(&mut self, op: &Operation) -> Conclusion {
-        let addr = self.reg[op.rs1()].wrapping_add(op.imm());
+        let addr = self.reg[op.rs1].wrapping_add(op.imm());
 
         if addr & 1 != 0 {
             todo!() // address-misaligned
@@ -383,7 +383,7 @@ impl<'a> Rv32i for Hart<'a> {
     /// Store byte
     #[inline(always)]
     fn sb(&mut self, op: &Operation) -> Conclusion {
-        let _addr = self.reg[op.rs1()].wrapping_add(op.imm());
+        let _addr = self.reg[op.rs1].wrapping_add(op.imm());
 
         todo!()
     }
@@ -391,7 +391,7 @@ impl<'a> Rv32i for Hart<'a> {
     /// Store half-word
     #[inline(always)]
     fn sh(&mut self, op: &Operation) -> Conclusion {
-        let addr = self.reg[op.rs1()].wrapping_add(op.imm());
+        let addr = self.reg[op.rs1].wrapping_add(op.imm());
 
         if addr & 1 != 0 {
             todo!() // address-misaligned
@@ -403,13 +403,13 @@ impl<'a> Rv32i for Hart<'a> {
     /// Store word
     #[inline(always)]
     fn sw(&mut self, op: &Operation) -> Conclusion {
-        let addr = self.reg[op.rs1()].wrapping_add(op.imm());
+        let addr = self.reg[op.rs1].wrapping_add(op.imm());
 
         if addr & 3 != 0 {
             todo!() // address-misaligned
         }
 
-        match self.mmu.store_word(addr, self.reg[op.rs2()]) {
+        match self.mmu.store_word(addr, self.reg[op.rs2]) {
             Ok(_) => Conclusion::None,
             Err(e) => {
                 println!("{:?}", e);
@@ -420,58 +420,56 @@ impl<'a> Rv32i for Hart<'a> {
 
     #[inline(always)]
     fn addi(&mut self, op: &Operation) -> Conclusion {
-        self.reg
-            .set(op.rd(), self.reg[op.rs1()].wrapping_add(op.imm()));
+        self.reg.set(op.rd, self.reg[op.rs1].wrapping_add(op.imm()));
         Conclusion::None
     }
 
     #[inline(always)]
     fn slti(&mut self, op: &Operation) -> Conclusion {
         self.reg.set(
-            op.rd(),
-            ((self.reg[op.rs1()] as i32) < (op.imm() as i32)) as u32,
+            op.rd,
+            ((self.reg[op.rs1] as i32) < (op.imm() as i32)) as u32,
         );
         Conclusion::None
     }
 
     #[inline(always)]
     fn sltiu(&mut self, op: &Operation) -> Conclusion {
-        self.reg
-            .set(op.rd(), (self.reg[op.rs1()] < op.imm()) as u32);
+        self.reg.set(op.rd, (self.reg[op.rs1] < op.imm()) as u32);
         Conclusion::None
     }
 
     #[inline(always)]
     fn xori(&mut self, op: &Operation) -> Conclusion {
-        self.reg.set(op.rd(), self.reg[op.rs1()] ^ op.imm());
+        self.reg.set(op.rd, self.reg[op.rs1] ^ op.imm());
         Conclusion::None
     }
 
     /// Or immediate
     #[inline(always)]
     fn ori(&mut self, op: &Operation) -> Conclusion {
-        self.reg.set(op.rd(), self.reg[op.rs1()] | op.imm());
+        self.reg.set(op.rd, self.reg[op.rs1] | op.imm());
         Conclusion::None
     }
 
     /// And immediate
     #[inline(always)]
     fn andi(&mut self, op: &Operation) -> Conclusion {
-        self.reg.set(op.rd(), self.reg[op.rs1()] & op.imm());
+        self.reg.set(op.rd, self.reg[op.rs1] & op.imm());
         Conclusion::None
     }
 
     /// Shift left logical immediate
     #[inline(always)]
     fn slli(&mut self, op: &Operation) -> Conclusion {
-        self.reg.set(op.rd(), self.reg[op.rs1()] << op.shamt());
+        self.reg.set(op.rd, self.reg[op.rs1] << op.shamt());
         Conclusion::None
     }
 
     /// Shift right logical immediate
     #[inline(always)]
     fn srli(&mut self, op: &Operation) -> Conclusion {
-        self.reg.set(op.rd(), self.reg[op.rs1()] >> op.shamt());
+        self.reg.set(op.rd, self.reg[op.rs1] >> op.shamt());
         Conclusion::None
     }
 
@@ -479,7 +477,7 @@ impl<'a> Rv32i for Hart<'a> {
     #[inline(always)]
     fn srai(&mut self, op: &Operation) -> Conclusion {
         self.reg
-            .set(op.rd(), (self.reg[op.rs1()] as i32 >> op.shamt()) as u32);
+            .set(op.rd, (self.reg[op.rs1] as i32 >> op.shamt()) as u32);
         Conclusion::None
     }
 
@@ -487,7 +485,7 @@ impl<'a> Rv32i for Hart<'a> {
     #[inline(always)]
     fn add(&mut self, op: &Operation) -> Conclusion {
         self.reg
-            .set(op.rd(), self.reg[op.rs1()].wrapping_add(self.reg[op.rs2()]));
+            .set(op.rd, self.reg[op.rs1].wrapping_add(self.reg[op.rs2]));
         Conclusion::None
     }
 
@@ -495,7 +493,7 @@ impl<'a> Rv32i for Hart<'a> {
     #[inline(always)]
     fn sub(&mut self, op: &Operation) -> Conclusion {
         self.reg
-            .set(op.rd(), self.reg[op.rs1()].wrapping_sub(self.reg[op.rs2()]));
+            .set(op.rd, self.reg[op.rs1].wrapping_sub(self.reg[op.rs2]));
         Conclusion::None
     }
 
@@ -503,7 +501,7 @@ impl<'a> Rv32i for Hart<'a> {
     #[inline(always)]
     fn sll(&mut self, op: &Operation) -> Conclusion {
         self.reg
-            .set(op.rd(), self.reg[op.rs1()] << (self.reg[op.rs2()] & 0x1f));
+            .set(op.rd, self.reg[op.rs1] << (self.reg[op.rs2] & 0x1f));
         Conclusion::None
     }
 
@@ -511,8 +509,8 @@ impl<'a> Rv32i for Hart<'a> {
     #[inline(always)]
     fn slt(&mut self, op: &Operation) -> Conclusion {
         self.reg.set(
-            op.rd(),
-            ((self.reg[op.rs1()] as i32) < (self.reg[op.rs2()] as i32)) as u32,
+            op.rd,
+            ((self.reg[op.rs1] as i32) < (self.reg[op.rs2] as i32)) as u32,
         );
         Conclusion::None
     }
@@ -521,15 +519,14 @@ impl<'a> Rv32i for Hart<'a> {
     #[inline(always)]
     fn sltu(&mut self, op: &Operation) -> Conclusion {
         self.reg
-            .set(op.rd(), (self.reg[op.rs1()] < self.reg[op.rs2()]) as u32);
+            .set(op.rd, (self.reg[op.rs1] < self.reg[op.rs2]) as u32);
         Conclusion::None
     }
 
     /// Exclusive or
     #[inline(always)]
     fn xor(&mut self, op: &Operation) -> Conclusion {
-        self.reg
-            .set(op.rd(), self.reg[op.rs1()] ^ self.reg[op.rs2()]);
+        self.reg.set(op.rd, self.reg[op.rs1] ^ self.reg[op.rs2]);
         Conclusion::None
     }
 
@@ -537,7 +534,7 @@ impl<'a> Rv32i for Hart<'a> {
     #[inline(always)]
     fn srl(&mut self, op: &Operation) -> Conclusion {
         self.reg
-            .set(op.rd(), self.reg[op.rs1()] >> (self.reg[op.rs2()] & 0x1f));
+            .set(op.rd, self.reg[op.rs1] >> (self.reg[op.rs2] & 0x1f));
         Conclusion::None
     }
 
@@ -545,8 +542,8 @@ impl<'a> Rv32i for Hart<'a> {
     #[inline(always)]
     fn sra(&mut self, op: &Operation) -> Conclusion {
         self.reg.set(
-            op.rd(),
-            (self.reg[op.rs1()] as i32 >> (self.reg[op.rs2()] & 0x1f)) as u32,
+            op.rd,
+            (self.reg[op.rs1] as i32 >> (self.reg[op.rs2] & 0x1f)) as u32,
         );
         Conclusion::None
     }
@@ -554,16 +551,14 @@ impl<'a> Rv32i for Hart<'a> {
     /// Or
     #[inline(always)]
     fn or(&mut self, op: &Operation) -> Conclusion {
-        self.reg
-            .set(op.rd(), self.reg[op.rs1()] | self.reg[op.rs2()]);
+        self.reg.set(op.rd, self.reg[op.rs1] | self.reg[op.rs2]);
         Conclusion::None
     }
 
     /// And
     #[inline(always)]
     fn and(&mut self, op: &Operation) -> Conclusion {
-        self.reg
-            .set(op.rd(), self.reg[op.rs1()] & self.reg[op.rs2()]);
+        self.reg.set(op.rd, self.reg[op.rs1] & self.reg[op.rs2]);
         Conclusion::None
     }
 
