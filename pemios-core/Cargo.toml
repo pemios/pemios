@@ -3,12 +3,5 @@ name = "pemios-core"
 version = "0.1.0"
 edition = "2021"
 
-[features]
-default = ["rv32a", "rv32m", "zicsr", "zifencei"]
-rv32a = []
-rv32m = []
-zicsr = []
-zifencei = []
-
 [dependencies]
 fnv = "1.0"
