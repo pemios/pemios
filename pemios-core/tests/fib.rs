@@ -81,7 +81,7 @@ mod tests {
                         break;
                     }
 
-                    if ctr > 200000000 {
+                    if ctr > 126000000 {
                         break;
                     }
                 }
@@ -105,7 +105,7 @@ mod tests {
                         break;
                     }
 
-                    if ctr > 200000000 {
+                    if ctr > 126000000 {
                         break;
                     }
                 }
