@@ -9,9 +9,9 @@
 
 use std::ops::{BitAnd, BitOr, BitXor};
 
-use crate::hart::Hart;
+use crate::hart::{instruction::Instruction, Hart};
 
-use super::{types::Conclusion, Instruction};
+use super::instruction::Conclusion;
 
 pub trait Step {
     fn step(&mut self) -> Conclusion;
@@ -144,11 +144,23 @@ impl Step for Hart<'_> {
                     Err(e) => todo!("{:?}", e),
                 }
             }
-
             Lbu { rd, rs1, imm } => todo!(),
             Lhu { rd, rs1, imm } => todo!(),
-            Sb { rs1, rs2, imm } => todo!(),
-            Sh { rs1, rs2, imm } => todo!(),
+
+            Sb { rs1, rs2, imm } => {
+                let addr = self.reg[rs1].wrapping_add_signed(imm.into());
+                match self.mmu.store_byte(addr, self.reg[rs2] as u8) {
+                    Ok(_) => Conclusion::None,
+                    Err(e) => todo!("{:?}", e),
+                }
+            }
+            Sh { rs1, rs2, imm } => {
+                let addr = self.reg[rs1].wrapping_add_signed(imm.into());
+                match self.mmu.store_half_word(addr, self.reg[rs2] as u16) {
+                    Ok(_) => Conclusion::None,
+                    Err(e) => todo!("{:?}", e),
+                }
+            }
             Sw { rs1, rs2, imm } => {
                 let addr = self.reg[rs1].wrapping_add_signed(imm.into());
                 match self.mmu.store_word(addr, self.reg[rs2]) {

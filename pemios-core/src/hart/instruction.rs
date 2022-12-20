@@ -1,5 +1,4 @@
 pub mod decode;
-pub mod execute;
 mod types;
 
 pub use types::Conclusion;

@@ -11,6 +11,7 @@ pub mod csr;
 pub mod instruction;
 pub mod mmu;
 pub mod register;
+pub mod step;
 pub mod sv32;
 mod utils;
 

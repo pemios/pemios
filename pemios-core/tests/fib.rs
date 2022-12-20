@@ -15,7 +15,7 @@ mod tests {
     use std::{cell::Cell, sync::atomic::AtomicU32, thread};
 
     use pemios_core::{
-        hart::instruction::{execute::Step, Instruction},
+        hart::{instruction::Instruction, step::Step},
         memory::{self, mapping::Mapping},
     };
 
