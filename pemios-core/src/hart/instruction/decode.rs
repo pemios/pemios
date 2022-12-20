@@ -304,3 +304,9 @@ impl From<u32> for Instruction {
         value.decode()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn decode() {}
+}

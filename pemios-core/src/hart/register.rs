@@ -368,6 +368,12 @@ pub struct RegisterFile {
     reg: [u32; 33],
 }
 
+impl Default for RegisterFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RegisterFile {
     pub fn new() -> Self {
         Self { reg: [0; 33] }

@@ -15,7 +15,7 @@ mod tests {
     use std::{cell::Cell, sync::atomic::AtomicU32, thread};
 
     use pemios_core::{
-        hart::instruction::execute::Step,
+        hart::instruction::{execute::Step, Instruction},
         memory::{self, mapping::Mapping},
     };
 
@@ -49,6 +49,17 @@ mod tests {
 
         let program = fs::read("resources/test_programs/fib").unwrap();
 
+        let (_, tmp, _) = unsafe { program.align_to::<u32>() };
+        let test = tmp
+            .iter()
+            .map(|v| Instruction::from(*v))
+            .collect::<Vec<_>>();
+
+        for (a, i) in test.iter().enumerate() {
+            let pc = a * 4;
+            println!("{pc}: {i:?}");
+        }
+
         let device = Device::new();
 
         let bus = &Bus::builder()
@@ -63,7 +74,6 @@ mod tests {
         };
 
         let reservation1 = &AtomicU32::new(0xffffffff);
-        let reservation2 = &AtomicU32::new(0xffffffff);
 
         thread::scope(|s| {
             s.spawn(|| {
@@ -74,44 +84,15 @@ mod tests {
 
                 let start = std::time::Instant::now();
 
-                let mut ctr = 0;
                 loop {
-                    ctr += 1;
                     if let Conclusion::Exception(_) = h.step() {
-                        break;
-                    }
-
-                    if ctr > 126000000 {
                         break;
                     }
                 }
 
                 let end = std::time::Instant::now();
 
-                println!("fib: took {:?}", end - start);
-            });
-
-            s.spawn(|| {
-                let mut h = Hart::new(bus, reservation2);
-                bus.register_reservation_set(reservation2);
-                h.reg[Reg::SP] = 0x2000;
-
-                let start = std::time::Instant::now();
-
-                let mut ctr = 0;
-                loop {
-                    ctr += 1;
-                    if let Conclusion::Exception(_) = h.step() {
-                        break;
-                    }
-
-                    if ctr > 126000000 {
-                        break;
-                    }
-                }
-
-                let end = std::time::Instant::now();
-
+                println!("{:?}", h.reg[Reg::A1]);
                 println!("fib: took {:?}", end - start);
             });
         });

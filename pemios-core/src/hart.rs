@@ -25,7 +25,7 @@ use crate::bus::Bus;
 use self::mmu::Mmu;
 
 pub struct Hart<'a> {
-    pc: u32,
+    pub pc: u32,
     pub reg: RegisterFile,
     mmu: Mmu<'a>,
     // csr: [u32; 4096],

@@ -9,7 +9,7 @@ use types::*;
 
 #[rustfmt::skip]
 #[allow(unused)]
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum Instruction {
     Lui   { rd: Reg, imm: Int32Trunc12 },
     Auipc { rd: Reg, imm: Int32Trunc12 },

@@ -55,87 +55,85 @@ impl Step for Hart<'_> {
             }
             Beq { rs1, rs2, imm } => {
                 if self.reg[rs1] != self.reg[rs2] {
-                    return Conclusion::None;
-                }
+                    Conclusion::None
+                } else {
+                    let target = self.pc.wrapping_add_signed(imm.into());
+                    if target & 3 != 0 {
+                        todo!("Add misaligned jump exception");
+                    }
 
-                let target = self.pc.wrapping_add_signed(imm.into());
-                if target & 3 != 0 {
-                    todo!("Add misaligned jump exception");
+                    self.pc = target;
+                    Conclusion::Jumped
                 }
-
-                self.pc = target;
-                Conclusion::Jumped
             }
             Bne { rs1, rs2, imm } => {
                 if self.reg[rs1] == self.reg[rs2] {
-                    return Conclusion::None;
-                }
+                    Conclusion::None
+                } else {
+                    let target = self.pc.wrapping_add_signed(imm.into());
+                    if target & 3 != 0 {
+                        todo!("Add misaligned jump exception");
+                    }
 
-                let target = self.pc.wrapping_add_signed(imm.into());
-                if target & 3 != 0 {
-                    todo!("Add misaligned jump exception");
+                    self.pc = target;
+                    Conclusion::Jumped
                 }
-
-                self.pc = target;
-                Conclusion::Jumped
             }
             Blt { rs1, rs2, imm } => {
                 if (self.reg[rs1] as i32) >= (self.reg[rs2] as i32) {
-                    return Conclusion::None;
-                }
+                    Conclusion::None
+                } else {
+                    let target = self.pc.wrapping_add_signed(imm.into());
+                    if target & 3 != 0 {
+                        todo!("Add misaligned jump exception");
+                    }
 
-                let target = self.pc.wrapping_add_signed(imm.into());
-                if target & 3 != 0 {
-                    todo!("Add misaligned jump exception");
+                    self.pc = target;
+                    Conclusion::Jumped
                 }
-
-                self.pc = target;
-                Conclusion::Jumped
             }
             Bge { rs1, rs2, imm } => {
                 if (self.reg[rs1] as i32) < (self.reg[rs2] as i32) {
-                    return Conclusion::None;
-                }
+                    Conclusion::None
+                } else {
+                    let target = self.pc.wrapping_add_signed(imm.into());
+                    if target & 3 != 0 {
+                        todo!("Add misaligned jump exception");
+                    }
 
-                let target = self.pc.wrapping_add_signed(imm.into());
-                if target & 3 != 0 {
-                    todo!("Add misaligned jump exception");
+                    self.pc = target;
+                    Conclusion::Jumped
                 }
-
-                self.pc = target;
-                Conclusion::Jumped
             }
             Bltu { rs1, rs2, imm } => {
                 if self.reg[rs1] >= self.reg[rs2] {
-                    return Conclusion::None;
-                }
+                    Conclusion::None
+                } else {
+                    let target = self.pc.wrapping_add_signed(imm.into());
+                    if target & 3 != 0 {
+                        todo!("Add misaligned jump exception");
+                    }
 
-                let target = self.pc.wrapping_add_signed(imm.into());
-                if target & 3 != 0 {
-                    todo!("Add misaligned jump exception");
+                    self.pc = target;
+                    Conclusion::Jumped
                 }
-
-                self.pc = target;
-                Conclusion::Jumped
             }
             Bgeu { rs1, rs2, imm } => {
                 if self.reg[rs1] < self.reg[rs2] {
-                    return Conclusion::None;
-                }
+                    Conclusion::None
+                } else {
+                    let target = self.pc.wrapping_add_signed(imm.into());
+                    if target & 3 != 0 {
+                        todo!("Add misaligned jump exception");
+                    }
 
-                let target = self.pc.wrapping_add_signed(imm.into());
-                if target & 3 != 0 {
-                    todo!("Add misaligned jump exception");
+                    self.pc = target;
+                    Conclusion::Jumped
                 }
-
-                self.pc = target;
-                Conclusion::Jumped
             }
 
-            Lb { rd, rs1, imm } => todo!(),
-
-            Lh { rd, rs1, imm } => todo!(),
-
+            Lb { rd, rs1, imm } => todo!("{rd:?}, {rs1:?}, {imm:?}"),
+            Lh { rd, rs1, imm } => todo!("{rd:?}, {rs1:?}, {imm:?}"),
             Lw { rd, rs1, imm } => {
                 let addr = self.reg[rs1].wrapping_add_signed(imm.into());
                 match self.mmu.load_word(addr) {
@@ -239,7 +237,10 @@ impl Step for Hart<'_> {
 
             #[rustfmt::skip]
             Fence { rd, rs1, pred, succ, mode } => todo!(),
-            Ecall => todo!("Implement ecall"),
+            Ecall => {
+                println!("Executed ebreak which is unimplemented!");
+                Conclusion::Exception(2)
+            }
             Ebreak => todo!("Implement ebreak"),
             Fencei { rd, rs1, imm } => todo!("Implement fencei"),
             CsrRw { rd, rs1, csr } => todo!(),

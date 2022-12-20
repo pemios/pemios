@@ -7,7 +7,7 @@
 //
 // Copyright © 2022 mumblingdrunkard
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 /// A Conclusion is used to indicate the status of the executed instruction.
 pub enum Conclusion {
     /// Conclusion::None indicates nothing special should hoppen
@@ -19,7 +19,7 @@ pub enum Conclusion {
     Exception(u8),
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 /// Unsigned, 5-bit integer
 /// Can be cast to a u32
 pub struct UInt5(u8);
@@ -37,7 +37,7 @@ impl From<UInt5> for u32 {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 /// Signed, 12-bit integer
 /// Can be cast to an i32
 pub struct Int12(i16);
@@ -58,7 +58,7 @@ impl From<Int12> for i32 {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 /// Signed, 32-bit integer with the 12 least significant bits set to 0
 /// Can be cast to an i32
 pub struct Int32Trunc12([u8; 3]);
@@ -85,7 +85,7 @@ impl From<Int32Trunc12> for i32 {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 /// Signed, 21-bit integer with the least significant bit set to 0
 /// Can be cast to an i32
 pub struct Int21Trunc1([u8; 3]);
@@ -109,7 +109,7 @@ impl From<Int21Trunc1> for i32 {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 /// Signed, 13-bit integer with the least significant bit set to 0
 /// Can be cast to an i32
 pub struct Int13Trunc1(i16);
@@ -127,7 +127,7 @@ impl From<Int13Trunc1> for i32 {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct FenceSet(u8);
 
 impl FenceSet {
@@ -157,7 +157,7 @@ impl FenceSet {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 /// The fence mode.
 /// Fence will never raise an exception meaning we can store this in a lossy format
 pub enum FenceMode {
@@ -176,7 +176,7 @@ impl FenceMode {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum OpCode {
     Load,
     MiscMem,
